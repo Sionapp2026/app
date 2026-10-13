@@ -1,0 +1,227 @@
+<!doctype html><html lang="nb"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#c9e1fb"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon.svg"><title>Sion Molde</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Yellowtail&family=Poppins:wght@400;500;600&display=swap">
+<style>
+/* Layout: mobilapp i smal kolonne, fast fanelinje nederst, innhold bytter per fane */
+:root{
+  --bg:#c9e1fb; --surface:#ffffff; --ink:#0f3a5f; --muted:#4a6d8c; --line:#b3d1f0;
+  --brand:#0f3a5f; --brand-ink:#ffffff; --lamp:#d9822b; --lamp-soft:#fdf0dd;
+  --ok:#1f6f8f; --ok-soft:#dbeefa; --chip:#cfe3fa;
+  --f-display:'Bebas Neue','Arial Narrow',Impact,sans-serif;
+  --f-script:'Yellowtail','Brush Script MT',cursive;
+  --f-body:'Poppins','Segoe UI',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0b2540; --surface:#123457; --ink:#e3f0ff; --muted:#9bbbdb; --line:#24507c;
+  --brand:#7fb8ee; --brand-ink:#08243f; --lamp:#f0a553; --lamp-soft:#3a2a14;
+  --ok:#8cd0f0; --ok-soft:#173d5c; --chip:#1c4a78; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0b2540; --surface:#123457; --ink:#e3f0ff; --muted:#9bbbdb; --line:#24507c;
+  --brand:#7fb8ee; --brand-ink:#08243f; --lamp:#f0a553; --lamp-soft:#3a2a14;
+  --ok:#8cd0f0; --ok-soft:#173d5c; --chip:#1c4a78; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45;margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--lamp);outline-offset:2px}
+.app{max-width:440px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);position:relative}
+header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 16px 8px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);z-index:5}
+.logo{display:flex;align-items:center;gap:10px;min-width:0}
+.logo-mark{width:38px;height:38px;border-radius:10px;background:var(--brand);color:var(--brand-ink);display:grid;place-items:center;font-family:var(--f-display);font-weight:800;font-size:20px;flex:none}
+.logo b{font-family:var(--f-display);font-weight:400;text-transform:uppercase;font-size:24px;letter-spacing:.02em;display:block;line-height:1}
+.logo span{font-size:13px;color:var(--muted)}
+.bell{position:relative;border:1px solid var(--line);background:var(--surface);width:42px;height:42px;border-radius:50%;display:grid;place-items:center;flex:none}
+.bell i{position:absolute;top:-2px;right:-2px;background:var(--lamp);color:#fff;font-style:normal;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:grid;place-items:center;padding:0 4px}
+main{flex:1;padding:8px 16px 110px;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--f-display);font-weight:400;text-transform:uppercase;margin:0;letter-spacing:.01em;text-wrap:balance}
+h1{font-size:40px;line-height:1}
+h2{font-size:26px;line-height:1.05}
+h3{font-size:22px;line-height:1.1}
+.script{font-family:var(--f-script);font-size:26px;color:var(--ink);transform:rotate(-3deg);display:block;margin-top:2px;text-transform:none}
+.hd{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.sub{color:var(--muted);margin:4px 0 0}
+.proto{background:var(--lamp-soft);color:var(--ink);border:1px dashed var(--lamp);border-radius:10px;padding:8px 12px;font-size:13px}
+.card{background:var(--surface);border:0;border-radius:14px;padding:16px;min-width:0}
+.next{background:var(--brand);color:var(--brand-ink);border-color:transparent}
+.next .eyebrow{opacity:.8}
+.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;font-weight:600;color:var(--muted)}
+.next h2{font-size:34px;margin:4px 0 6px}
+.next .meta{opacity:.9;font-size:15px}
+.alert{border-left:4px solid var(--lamp);background:var(--lamp-soft);border-radius:4px 14px 14px 4px;padding:12px 14px}
+.alert b{display:block}
+.row{display:flex;gap:12px;align-items:center;min-width:0}
+.date{flex:none;width:92px;text-align:center;border-radius:10px;background:var(--chip);padding:12px 4px;line-height:1.1;font-weight:500;font-size:15px;white-space:nowrap}
+.grow{flex:1;min-width:0}
+.grow b{display:block;overflow-wrap:anywhere}
+.small{font-size:14px;color:var(--muted)}
+.tag{display:inline-block;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--chip);color:var(--ink)}
+.tag.m{background:var(--ok-soft);color:var(--ok)}
+.list{display:flex;flex-direction:column;gap:10px}
+.item{background:var(--surface);border:0;border-radius:14px;overflow:hidden}
+.item>button{all:unset;display:flex;gap:12px;align-items:center;padding:12px;width:100%;box-sizing:border-box;cursor:pointer}
+.item>button:focus-visible{outline:3px solid var(--lamp);outline-offset:-3px}
+.detail{padding:0 14px 14px 116px;display:none;flex-direction:column;gap:10px}
+.item.open .detail{display:flex}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:8px 14px;font-weight:600;font-size:14px}
+.btn.on{background:var(--brand);color:var(--brand-ink);border-color:var(--brand)}
+.btn.primary{background:var(--brand);color:var(--brand-ink);border-color:var(--brand);padding:12px 18px;font-size:16px;border-radius:12px;width:100%}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+.chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:7px 14px;font-weight:600;font-size:14px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.day{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;margin:6px 0 -2px}
+.post{display:flex;flex-direction:column;gap:6px}
+.post .head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--lamp);flex:none}
+.locked{display:flex;gap:12px;align-items:center;color:var(--muted)}
+.switch{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.switch:last-child{border:0}
+.tg{flex:none;width:48px;height:28px;border-radius:14px;background:var(--line);border:0;position:relative;transition:background .15s}
+.tg::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .15s}
+.tg[aria-checked="true"]{background:var(--brand)}
+.tg[aria-checked="true"]::after{transform:translateX(20px)}
+label.f{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:14px}
+input,textarea,select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px;width:100%}
+.form{display:flex;flex-direction:column;gap:12px}
+nav.tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--line);padding:6px 6px calc(6px + env(safe-area-inset-bottom,0px));z-index:6}
+nav.tabs button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:12px;font-weight:600;color:var(--muted);border-radius:10px}
+nav.tabs button[aria-current="page"]{color:var(--brand)}
+nav.tabs svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#push{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:50%;transform:translate(-50%,-140%);width:calc(100% - 24px);max-width:416px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.25);z-index:20;transition:transform .35s;display:flex;gap:10px;align-items:flex-start}
+#push.show{transform:translate(-50%,0)}
+#push .logo-mark{width:30px;height:30px;font-size:16px;border-radius:8px}
+#push b{display:block;font-size:14px}
+#push span{font-size:14px;color:var(--muted)}
+.theme{border:0;background:none;color:var(--muted);font-size:13px;text-decoration:underline;align-self:center}
+@media (prefers-reduced-motion:reduce){#push,.tg,.tg::after{transition:none}}
+</style></head><body>
+
+<div class="app">
+  <header class="top">
+    <div class="logo"><div class="logo-mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v18M6 9h12"/></svg></div><div><b>Sion Molde</b><span id="today"></span></div></div>
+    <button class="bell" id="bellBtn" aria-label="Varsler"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg><i id="badge">0</i></button>
+  </header>
+  <main id="view"></main>
+  <nav class="tabs" id="tabs"></nav>
+</div>
+<div id="push" role="status" aria-live="polite"><div class="logo-mark">S</div><div><b id="pushT"></b><span id="pushB"></span></div></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const DAYS=['søndag','mandag','tirsdag','onsdag','torsdag','fredag','lørdag'];
+const MON=['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
+const now=new Date();
+function inDays(n,h,m){const d=new Date(now);d.setDate(d.getDate()+n);d.setHours(h,m||0,0,0);return d}
+const pad=n=>String(n).padStart(2,'0');
+const hm=d=>pad(d.getHours())+':'+pad(d.getMinutes());
+const cap=s=>s[0].toUpperCase()+s.slice(1);
+$('#today').textContent=cap(DAYS[now.getDay()])+' '+now.getDate()+'. '+MON[now.getMonth()];
+
+/* Data hentes fra data/events.json og data/posts.json. Rediger de filene for å endre innholdet. */
+let events=[],posts=[];
+const todayStart=new Date(now);todayStart.setHours(0,0,0,0);
+async function load(){
+  const [e,p]=await Promise.all([fetch('data/events.json').then(r=>r.json()),fetch('data/posts.json').then(r=>r.json())]);
+  events=e.map(x=>({...x,t:x.title,d:x.text,w:new Date(x.start+'T'+(x.time||'00:00')),e:x.end?new Date(x.end+'T23:59'):null}))
+    .filter(x=>(x.e||x.w)>=todayStart).sort((a,b)=>a.w-b.w);
+  posts=p;
+}
+const tm=e=>e.time?' kl. '+e.time:'';
+const state={tab:'home',filter:'Alle',member:false,rsvp:{},rem:{},open:{},
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:2};
+try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
+const save=()=>{try{localStorage.setItem('sm-proto',JSON.stringify({member:state.member,rsvp:state.rsvp,rem:state.rem,prefs:state.prefs}))}catch(e){}};
+
+const ICON={
+ home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
+ cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+ news:'<path d="M4 5h13v14H6a2 2 0 0 1-2-2z"/><path d="M17 9h3v8a2 2 0 0 1-2 2M8 9h6M8 13h6"/>',
+ me:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>'};
+const TABS=[['home','Hjem','home'],['prog','Program','cal'],['news','Nyheter','news'],['me','Meg','me']];
+function drawTabs(){$('#tabs').innerHTML=TABS.map(([k,l,i])=>`<button data-t="${k}" ${state.tab===k?'aria-current="page"':''}><svg viewBox="0 0 24 24">${ICON[i]}</svg>${l}</button>`).join('')}
+
+function when(d){const diff=Math.round((new Date(d).setHours(0,0,0,0)-new Date(now).setHours(0,0,0,0))/864e5);
+  return diff===0?'I dag':diff===1?'I morgen':cap(DAYS[d.getDay()])}
+function dateBox(ev){const d=ev.w,e=ev.e;const m=cap(MON[d.getMonth()]);const s=e&&e.getTime()!==new Date(d).setHours(23,59,0,0)?`${d.getDate()}.${e.getMonth()===d.getMonth()?'-'+e.getDate()+'. '+m:' '+m+'-'+e.getDate()+'. '+cap(MON[e.getMonth()])}`:`${d.getDate()}. ${m}`;return `<div class="date">${s.replace('.-','.–')}</div>`}
+function evItem(e){
+  if(e.m&&!state.member)return `<div class="item"><div class="locked" style="padding:12px">${dateBox(e)}<div class="grow"><b>${e.t}</b><span class="small">Kun for medlemmer. Logg inn under «Meg».</span></div></div></div>`;
+  const open=state.open[e.id],r=state.rsvp[e.id],rem=state.rem[e.id];
+  return `<div class="item ${open?'open':''}"><button data-ev="${e.id}" aria-expanded="${!!open}">${dateBox(e)}
+   <div class="grow"><b>${e.t}</b><span class="small">${when(e.w)} ${tm(e)}${e.place?' · '+e.place:''}</span></div>
+   ${e.m?'<span class="tag m">Medlem</span>':`<span class="tag">${e.cat}</span>`}</button>
+   <div class="detail"><div>${e.d}</div><div class="small">${e.who}</div>
+   <div class="btns"><button class="btn ${r?'on':''}" data-rsvp="${e.id}">${r?'✓ Jeg kommer':'Jeg kommer'}</button>
+   <button class="btn ${rem?'on':''}" data-rem="${e.id}">${rem?'Påminnelse på':'Minn meg på det'}</button></div></div></div>`}
+
+function home(){
+  const vis=events.filter(e=>!e.m||state.member), n=vis[0], wk=vis.slice(1,4);
+  return `<div><h1>Velkommen</h1><span class="script">dette skjer i Sion Molde</span></div>
+  <div class="proto"><b>Prototype.</b> Alle møter og meldinger er eksempeldata. Trykk rundt og prøv.</div>
+  <div class="card next"><div class="eyebrow">Neste samling</div><h2>${n.t}</h2>
+   <div class="meta">${when(n.w)} ${tm(n)} · ${n.place}</div>
+   <div class="btns" style="margin-top:12px"><button class="btn" style="color:var(--ink)" data-rsvp="${n.id}" data-stay="1">${state.rsvp[n.id]?'✓ Jeg kommer':'Jeg kommer'}</button></div></div>
+  <div class="alert"><b>${posts[0].t}</b><span class="small">${posts[0].b}</span></div>
+  <div><h2 style="margin-bottom:10px">Resten av uken</h2><div class="list">${wk.map(evItem).join('')}</div></div>
+  <div class="card"><h2>Finn frem</h2><p class="small" style="margin:6px 0 0">Adresse: Eksempelgata 1, Molde<br>Kafeen er åpen før og etter møtene.<br>Kontakt: kontakt@eksempel.no</p></div>`}
+
+function prog(){
+  const cats=['Alle','Møter','Happeninger','Ungdom'];
+  const list=events.filter(e=>state.filter==='Alle'||e.cat===state.filter);
+  let last='',out='';
+  list.forEach(e=>{const k=when(e.w)+' '+e.w.getDate()+'. '+MON[e.w.getMonth()];
+    if(k!==last){out+=`<div class="day">${k}</div>`;last=k}out+=evItem(e)});
+  return `<div class="hd"><h1>Kommende arrangementer</h1><span class="script">sett av datoene!</span></div><div class="chips">${cats.map(c=>`<button class="chip" data-f="${c}" aria-pressed="${state.filter===c}">${c}</button>`).join('')}</div>
+  <div class="list">${out||'<p class="small">Ingen oppføringer her ennå.</p>'}</div>`}
+
+function news(){
+  return `<h1>Nyheter</h1><div class="list">${posts.map(p=>{
+   if(p.m&&!state.member)return `<div class="card locked"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><div><b style="color:var(--ink)">${p.t}</b><div class="small">Logg inn som medlem for å lese.</div></div></div>`;
+   return `<div class="card post"><div class="head">${p.unread&&!p.read?'<span class="dot" title="Ulest"></span>':''}<span class="tag ${p.m?'m':''}">${p.tag}</span><span class="small">${p.ago}</span></div><h3>${p.t}</h3><div class="small" style="color:var(--ink)">${p.b}</div></div>`}).join('')}</div>`}
+
+function me(){
+  const sw=(k,l,s)=>`<div class="switch"><div><b>${l}</b><div class="small">${s}</div></div><button class="tg" role="switch" aria-checked="${state.prefs[k]}" aria-label="${l}" data-pref="${k}"></button></div>`;
+  return `<h1>Meg</h1>
+  <div class="card"><div class="row"><div class="grow"><b>${state.member?'Innlogget som medlem':'Besøkende'}</b><div class="small">${state.member?'Du ser intern informasjon og medlemsmøter.':'Logg inn for å se intern informasjon.'}</div></div>
+  <button class="btn ${state.member?'':'primary'}" style="${state.member?'':'width:auto;padding:10px 16px;font-size:14px'}" data-login>${state.member?'Logg ut':'Logg inn'}</button></div>
+  <p class="small" style="margin:8px 0 0">I den ferdige appen: engangskode på SMS.</p></div>
+  <div class="card"><h2>Varsler</h2>${sw('Møter','Møter','Påminnelse før hvert møte')}${sw('Happeninger','Happeninger','Konserter, dugnader og turer')}${sw('Ungdom','Ungdom','Bare for ungdomsgruppa')}${sw('Viktig','Viktige meldinger','Endringer og avlysninger')}</div>
+  <div class="card"><h2>Administrator (demo)</h2><p class="small" style="margin:4px 0 12px">Slik sender en leder ut en melding. Du får varselet på denne telefonen.</p>
+  <form class="form" id="adm"><label class="f">Tittel<input id="aT" value="Møtet i kveld er flyttet til kl. 19:00" required></label>
+  <label class="f">Melding<textarea id="aB" rows="2">Vi starter en halvtime senere på grunn av øving.</textarea></label>
+  <label class="f">Målgruppe<select id="aG"><option>Alle</option><option>Kun medlemmer</option><option>Ungdom</option></select></label>
+  <button class="btn primary" type="submit">Send varsel</button></form></div>
+  <button class="theme" id="thm">Bytt lys/mørk visning</button>`}
+
+function render(){
+  drawTabs();
+  $('#view').innerHTML={home,prog,news,me}[state.tab]();
+  $('#badge').textContent=state.unread;$('#badge').hidden=!state.unread;
+  window.scrollTo(0,0);
+}
+let pt;
+function push(t,b){$('#pushT').textContent=t;$('#pushB').textContent=b;$('#push').classList.add('show');clearTimeout(pt);pt=setTimeout(()=>$('#push').classList.remove('show'),4500)}
+function keep(fn){const y=scrollY;fn();const v=$('#view');v.innerHTML={home,prog,news,me}[state.tab]();drawTabs();window.scrollTo(0,y)}
+
+document.addEventListener('click',e=>{
+  const c=e.target.closest('button');if(!c)return;
+  if(c.dataset.t){state.tab=c.dataset.t;if(state.tab==='news'){state.unread=0;posts.forEach(p=>p.read=true)}render()}
+  else if(c.id==='bellBtn'){state.tab='news';state.unread=0;posts.forEach(p=>p.read=true);render()}
+  else if(c.dataset.ev){keep(()=>state.open[c.dataset.ev]=!state.open[c.dataset.ev])}
+  else if(c.dataset.rsvp){keep(()=>{state.rsvp[c.dataset.rsvp]=!state.rsvp[c.dataset.rsvp];save()})}
+  else if(c.dataset.rem){const id=c.dataset.rem;keep(()=>{state.rem[id]=!state.rem[id];save()});
+    if(state.rem[id])push('Påminnelse lagt inn',events.find(x=>x.id==id).t+' – du får varsel i forkant.')}
+  else if(c.dataset.f){state.filter=c.dataset.f;keep(()=>{})}
+  else if(c.dataset.pref){keep(()=>{state.prefs[c.dataset.pref]=!state.prefs[c.dataset.pref];save()})}
+  else if('login' in c.dataset){keep(()=>{state.member=!state.member;save()})}
+  else if(c.id==='thm'){const r=document.documentElement;const dark=(r.dataset.theme||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'))==='dark';r.dataset.theme=dark?'light':'dark'}
+});
+document.addEventListener('submit',e=>{
+  if(e.target.id!=='adm')return;e.preventDefault();
+  const t=$('#aT').value.trim(),b=$('#aB').value.trim(),g=$('#aG').value;
+  posts.unshift({id:Date.now(),t,b,ago:'nå',tag:g==='Alle'?'Alle':g==='Ungdom'?'Ungdom':'Medlem',m:g==='Kun medlemmer',unread:true});
+  state.unread++;keep(()=>{});$('#badge').textContent=state.unread;$('#badge').hidden=false;
+  push(t,b);
+});
+load().then(render).catch(()=>{$('#view').textContent='Kunne ikke laste program. Prøv igjen senere.'});
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body></html>

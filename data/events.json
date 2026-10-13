@@ -1,0 +1,8 @@
+[
+  {"id":1,"title":"Debora samling med lunsj","start":"2026-09-12","cat":"Happeninger","place":"","who":"Taler: Gina Hustad","text":""},
+  {"id":2,"title":"Agapefest","start":"2026-09-13","cat":"Happeninger","place":"","who":"Taler: Håkon Hustad","text":""},
+  {"id":3,"title":"Besøk av Lars Kapelrud","start":"2026-09-20","cat":"Møter","place":"","who":"","text":""},
+  {"id":4,"title":"Besøk av Halvard Hasseløy","start":"2026-10-03","end":"2026-10-04","cat":"Møter","place":"","who":"","text":""},
+  {"id":5,"title":"Besøk av Ingar Jensen","start":"2026-11-01","cat":"Møter","place":"","who":"","text":""},
+  {"id":6,"title":"Besøk av Remy Andre Hornes","start":"2026-12-04","end":"2026-12-06","cat":"Møter","place":"","who":"","text":""}
+]

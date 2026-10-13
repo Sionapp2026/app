@@ -1,0 +1,4 @@
+[
+  {"id":1,"t":"Velkommen til appen","b":"Her kommer møtetider, happeninger og beskjeder. Dette er et eksempelinnlegg.","ago":"i dag","tag":"Alle","unread":true},
+  {"id":2,"t":"Eksempel på medlemsmelding","b":"Meldinger merket Medlem vises bare etter innlogging.","ago":"i dag","tag":"Medlem","m":true,"unread":true}
+]
