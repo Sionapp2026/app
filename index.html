@@ -155,12 +155,12 @@ function evItem(e){
 function home(){
   const vis=events.filter(e=>!e.m||state.member), n=vis[0], wk=vis.slice(1,4);
   return `<div><h1>Velkommen</h1><span class="script">dette skjer i Sion Molde</span></div>
-  <div class="proto"><b>Prototype.</b> Alle møter og meldinger er eksempeldata. Trykk rundt og prøv.</div>
+  <div class="proto"><b>Under utvikling.</b> Meldingene og kontaktinfo under er eksempler.</div>
   <div class="card next"><div class="eyebrow">Neste samling</div><h2>${n.t}</h2>
-   <div class="meta">${when(n.w)} ${tm(n)} · ${n.place}</div>
+   <div class="meta">${when(n.w)}${tm(n)}${n.place?' · '+n.place:''}</div>
    <div class="btns" style="margin-top:12px"><button class="btn" style="color:var(--ink)" data-rsvp="${n.id}" data-stay="1">${state.rsvp[n.id]?'✓ Jeg kommer':'Jeg kommer'}</button></div></div>
   <div class="alert"><b>${posts[0].t}</b><span class="small">${posts[0].b}</span></div>
-  <div><h2 style="margin-bottom:10px">Resten av uken</h2><div class="list">${wk.map(evItem).join('')}</div></div>
+  <div><h2 style="margin-bottom:10px">Kommer snart</h2><div class="list">${wk.map(evItem).join('')}</div></div>
   <div class="card"><h2>Finn frem</h2><p class="small" style="margin:6px 0 0">Adresse: Eksempelgata 1, Molde<br>Kafeen er åpen før og etter møtene.<br>Kontakt: kontakt@eksempel.no</p></div>`}
 
 function prog(){
