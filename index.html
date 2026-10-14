@@ -1,4 +1,4 @@
-<!doctype html><html lang="nb"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#c9e1fb"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><link rel="apple-touch-icon" href="icon.svg"><title>Sion Molde</title>
+<!doctype html><html lang="nb"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#c9e1fb"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-180.png"><title>Sion Molde</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Yellowtail&family=Poppins:wght@400;500;600&display=swap">
 <style>
@@ -26,7 +26,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 .app{max-width:440px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);position:relative}
 header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 16px 8px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);z-index:5}
 .logo{display:flex;align-items:center;gap:10px;min-width:0}
-.logo-mark{width:38px;height:38px;border-radius:10px;background:var(--brand);color:var(--brand-ink);display:grid;place-items:center;font-family:var(--f-display);font-weight:800;font-size:20px;flex:none}
+.logo-mark{width:46px;height:46px;border-radius:10px;background:#c9e1fb;display:grid;place-items:center;flex:none;padding:3px}
+.logo-mark img{width:100%;height:100%;object-fit:contain}
 .logo b{font-family:var(--f-display);font-weight:400;text-transform:uppercase;font-size:24px;letter-spacing:.02em;display:block;line-height:1}
 .logo span{font-size:13px;color:var(--muted)}
 .bell{position:relative;border:1px solid var(--line);background:var(--surface);width:42px;height:42px;border-radius:50%;display:grid;place-items:center;flex:none}
@@ -68,6 +69,11 @@ h3{font-size:22px;line-height:1.1}
 .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
 .chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:7px 14px;font-weight:600;font-size:14px}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.reg{display:flex;flex-direction:column;gap:2px}
+.reg .r{display:flex;gap:12px;align-items:baseline;padding:10px 0;border-bottom:1px solid var(--line)}
+.reg .r:last-child{border:0}
+.reg .d{flex:none;width:86px;font-weight:600}
+.reg .d span{display:block;font-weight:400;font-size:14px;color:var(--muted)}
 .day{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;margin:6px 0 -2px}
 .post{display:flex;flex-direction:column;gap:6px}
 .post .head{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -97,13 +103,13 @@ nav.tabs svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1
 
 <div class="app">
   <header class="top">
-    <div class="logo"><div class="logo-mark"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 3v18M6 9h12"/></svg></div><div><b>Sion Molde</b><span id="today"></span></div></div>
+    <div class="logo"><div class="logo-mark"><img src="logo-512.png" alt="Sion Molde"></div><div><b>Sion Molde</b><span id="today"></span></div></div>
     <button class="bell" id="bellBtn" aria-label="Varsler"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg><i id="badge">0</i></button>
   </header>
   <main id="view"></main>
   <nav class="tabs" id="tabs"></nav>
 </div>
-<div id="push" role="status" aria-live="polite"><div class="logo-mark">S</div><div><b id="pushT"></b><span id="pushB"></span></div></div>
+<div id="push" role="status" aria-live="polite"><div class="logo-mark"><img src="logo-512.png" alt=""></div><div><b id="pushT"></b><span id="pushB"></span></div></div>
 
 <script>
 const $=s=>document.querySelector(s);
@@ -117,13 +123,14 @@ const cap=s=>s[0].toUpperCase()+s.slice(1);
 $('#today').textContent=cap(DAYS[now.getDay()])+' '+now.getDate()+'. '+MON[now.getMonth()];
 
 /* Data hentes fra data/events.json og data/posts.json. Rediger de filene for å endre innholdet. */
-let events=[],posts=[];
+let events=[],posts=[],regular=[];
 const todayStart=new Date(now);todayStart.setHours(0,0,0,0);
 async function load(){
-  const [e,p]=await Promise.all([fetch('data/events.json').then(r=>r.json()),fetch('data/posts.json').then(r=>r.json())]);
+  const [e,p,g]=await Promise.all([fetch('data/events.json').then(r=>r.json()),fetch('data/posts.json').then(r=>r.json()),fetch('data/regular.json').then(r=>r.json()).catch(()=>[])]);
   events=e.map(x=>({...x,t:x.title,d:x.text,w:new Date(x.start+'T'+(x.time||'00:00')),e:x.end?new Date(x.end+'T23:59'):null}))
     .filter(x=>(x.e||x.w)>=todayStart).sort((a,b)=>a.w-b.w);
   posts=p;
+  regular=g.sort((a,b)=>((a.day+6)%7-(b.day+6)%7)||a.time.localeCompare(b.time));
 }
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,rsvp:{},rem:{},open:{},
@@ -169,7 +176,12 @@ function prog(){
   list.forEach(e=>{const k=when(e.w)+' '+e.w.getDate()+'. '+MON[e.w.getMonth()];
     if(k!==last){out+=`<div class="day">${k}</div>`;last=k}out+=evItem(e)});
   return `<div class="hd"><h1>Kommende arrangementer</h1><span class="script">sett av datoene!</span></div><div class="chips">${cats.map(c=>`<button class="chip" data-f="${c}" aria-pressed="${state.filter===c}">${c}</button>`).join('')}</div>
-  <div class="list">${out||'<p class="small">Ingen oppføringer her ennå.</p>'}</div>`}
+  <div class="list">${out||'<p class="small">Ingen oppføringer her ennå.</p>'}</div>${regList()}`}
+
+function regList(){
+  const l=regular.filter(r=>state.filter==='Alle'||r.cat===state.filter);
+  if(!l.length)return '';
+  return `<div><h2 style="margin-bottom:10px">Faste samlinger</h2><div class="card reg">${l.map(r=>`<div class="r"><div class="d">${cap(DAYS[r.day])}<span>kl. ${r.time}</span></div><div class="grow"><b>${r.title}</b>${r.note?`<span class="small">${r.note}</span>`:''}</div></div>`).join('')}</div></div>`}
 
 function news(){
   return `<h1>Nyheter</h1><div class="list">${posts.map(p=>{

@@ -1,0 +1,10 @@
+[
+  {"day":1,"time":"18:00","title":"Mannsfellesskapet C-dur","note":"Oddetallsuker","cat":"Møter"},
+  {"day":2,"time":"12:00","title":"Bønnemøte med sosialt samvær","note":"","cat":"Møter"},
+  {"day":2,"time":"19:00","title":"Hangout, unge voksne","note":"Partallsuker","cat":"Ungdom"},
+  {"day":4,"time":"19:00","title":"Bønnemøte","note":"","cat":"Møter"},
+  {"day":5,"time":"19:00","title":"Activ8, ungdomsmøte","note":"","cat":"Ungdom"},
+  {"day":6,"time":"16:00","title":"Slavic service","note":"Møte for østeuropeere, ca. én gang i måneden","cat":"Møter"},
+  {"day":0,"time":"11:00","title":"Bønnemøte","note":"","cat":"Møter"},
+  {"day":0,"time":"12:00","title":"Ukens storsamling","note":"Lovsang, undervisning, søndagsskole og mer","cat":"Møter"}
+]
