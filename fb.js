@@ -11,6 +11,7 @@ try{
     messagingSenderId:"792770444668",
     appId:"1:792770444668:web:ee5b9814f1190666adf8f9"});
   const auth=A.getAuth(app),db=S.getFirestore(app);
+  await A.setPersistence(auth,A.browserLocalPersistence).catch(()=>{});   // brukeren forblir innlogget til hen logger ut
   // Egen forekomst brukes til å opprette brukere, slik at administratoren ikke logges ut av seg selv.
   const secAuth=A.getAuth(initializeApp(app.options,'oppretter'));
   const FB={

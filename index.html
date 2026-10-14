@@ -284,14 +284,14 @@ function loginCard(){
   if(state.user)return `<div class="card"><div class="row"><div class="grow"><b>${state.member?'Innlogget som medlem':'Innlogget, men ikke på medlemslisten'}</b><div class="small">${esc(state.user.email)}${state.admin?' · administrator':''}</div></div>
    <button class="btn" data-logout>Logg ut</button></div>
    <details style="margin-top:12px"${state.pwMsg?' open':''}><summary style="cursor:pointer;font-weight:600">Endre passord</summary>
-   <form class="form" id="pw" style="margin-top:10px">${pwField('pO','Nåværende passord','current-password')}
+   <form class="form" id="pw" method="post" action="#" style="margin-top:10px"><input type="text" name="username" autocomplete="username" value="${esc(state.user.email)}" readonly tabindex="-1" aria-hidden="true" style="display:none">${pwField('pO','Nåværende passord','current-password')}
    ${pwField('pN','Nytt passord (minst 8 tegn)','new-password','minlength="8"')}
    ${pwField('pR','Gjenta nytt passord','new-password','minlength="8"')}
    <button class="btn primary" type="submit">Lagre nytt passord</button></form>
    <p class="small" role="status" style="margin:8px 0 0">${esc(state.pwMsg)}</p></details></div>`;
   return `<div class="card"><h2>Logg inn</h2><p class="small" style="margin:4px 0 12px">For medlemmer og ledere. Du får en e-post fra menigheten der du velger passord.</p>
-  ${FB?`<form class="form" id="login"><label class="f">E-post<input id="lE" type="email" autocomplete="username" required></label>
-  ${pwField('lP','Passord','current-password')}
+  ${FB?`<form class="form" id="login" method="post" action="#"><label class="f">E-post<input id="lE" name="email" type="email" autocomplete="username" required></label>
+  ${pwField('lP','Passord','current-password','name="password"')}
   <button class="btn primary" type="submit">Logg inn</button><button class="theme" type="button" data-reset>Glemt passord?</button></form>
   <p class="small" role="status" style="margin:8px 0 0">${esc(state.err)}</p>`:'<p class="small">Innlogging er ikke tilgjengelig akkurat nå.</p>'}</div>`}
 
@@ -365,7 +365,8 @@ document.addEventListener('click',async e=>{
 document.addEventListener('submit',async e=>{
   const f=e.target;
   if(f.id==='login'){e.preventDefault();
-    try{await FB.login($('#lE').value.trim(),$('#lP').value);state.err=''}catch(er){keep(()=>state.err=authMsg(er.code))}}
+    try{const em=$('#lE').value.trim(),pw=$('#lP').value;await FB.login(em,pw);state.err='';
+      try{if(window.PasswordCredential)await navigator.credentials.store(new PasswordCredential({id:em,password:pw,name:em}))}catch(x){}}catch(er){keep(()=>state.err=authMsg(er.code))}}
   else if(f.id==='mem'){e.preventDefault();
     const m=$('#mE').value.trim().toLowerCase(),role=$('#mR').value;
     try{const r=await FB.addUser(m,role);state.memE='';state.memR='member';state.memMsg=r.created?'Bruker opprettet som '+(role==='admin'?'administrator':'medlem')+'. '+m+' har fått en e-post for å velge passord.':m+' hadde allerede en konto og er lagt inn som '+(role==='admin'?'administrator':'medlem')+'.'}
@@ -375,7 +376,8 @@ document.addEventListener('submit',async e=>{
     const o=$('#pO').value,n=$('#pN').value,r=$('#pR').value;
     if(n!==r){keep(()=>state.pwMsg='De to nye passordene er ikke like.');return}
     if(n===o){keep(()=>state.pwMsg='Det nye passordet må være et annet enn det gamle.');return}
-    try{await FB.changePassword(o,n);keep(()=>state.pwMsg='Passordet er endret.')}
+    try{await FB.changePassword(o,n);keep(()=>state.pwMsg='Passordet er endret.');
+      try{if(window.PasswordCredential)await navigator.credentials.store(new PasswordCredential({id:state.user.email,password:n,name:state.user.email}))}catch(x){}}
     catch(er){keep(()=>state.pwMsg=er.code==='auth/invalid-credential'||er.code==='auth/wrong-password'?'Nåværende passord er feil.':authMsg(er.code))}}
   else if(f.id==='sv'){e.preventDefault();
     const m=$('#svE').value.trim().toLowerCase();
