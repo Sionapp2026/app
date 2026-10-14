@@ -155,7 +155,6 @@ function evItem(e){
 function home(){
   const vis=events.filter(e=>!e.m||state.member), n=vis[0], wk=vis.slice(1,4);
   return `<div><h1>Velkommen</h1><span class="script">dette skjer i Sion Molde</span></div>
-  <div class="proto"><b>Under utvikling.</b> Meldingene og kontaktinfo under er eksempler.</div>
   <div class="card next"><div class="eyebrow">Neste samling</div><h2>${n.t}</h2>
    <div class="meta">${when(n.w)}${tm(n)}${n.place?' · '+n.place:''}</div>
    <div class="btns" style="margin-top:12px"><button class="btn" style="color:var(--ink)" data-rsvp="${n.id}" data-stay="1">${state.rsvp[n.id]?'✓ Jeg kommer':'Jeg kommer'}</button></div></div>
