@@ -163,7 +163,7 @@ function ago(p){
   const x=new Date(p.ms);return x.getDate()+'. '+MON[x.getMonth()]}
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,adm:{type:'events',edit:null},msg:'',err:''};
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
 state.member=false;state.admin=false;state.user=null;
 const save=()=>{try{localStorage.setItem('sm-proto',JSON.stringify({rsvp:state.rsvp,rem:state.rem,prefs:state.prefs}))}catch(e){}};
@@ -189,6 +189,14 @@ function evItem(e){
    <div class="btns"><button class="btn ${r?'on':''}" data-rsvp="${e.id}">${r?'✓ Jeg kommer':'Jeg kommer'}</button>
    <button class="btn ${rem?'on':''}" data-rem="${e.id}">${rem?'Påminnelse på':'Minn meg på det'}</button></div></div></div>`}
 
+/* Påmeldingen går til Google Skjema «Sommerstevne påmeldinger nyhetsbrev». Svarene havner i et regneark i Drive,
+   og scriptet i regnearket sender e-postvarsel. Google svarer ikke tilbake til nettsider, så vi kan ikke se om det lyktes. */
+const SV_URL='https://docs.google.com/forms/d/e/1FAIpQLScYERloVM4jsoPdXmpeqJYecXNBGl6GNNjNl5vequqCrTvSWw/formResponse',SV_ENTRY='entry.1990573754';
+function svCard(){
+  return `<div class="card"><h2>Sommerstevne</h2><p class="small" style="margin:6px 0 12px">Neste sommerstevne er <b>22.–27. juni 2027</b>. Legg igjen e-posten din for å få mer info.</p>
+  <form class="form" id="sv"><label class="f">E-post<input id="svE" type="email" autocomplete="email" required value="${esc(state.svE)}"></label><button class="btn primary" type="submit">Meld meg på</button></form>
+  <p class="small" role="status" style="margin:8px 0 0">${esc(state.sv)}</p><p class="small" style="margin:6px 0 0">E-posten brukes bare til informasjon om sommerstevnet.</p></div>`}
+
 function home(){
   const vis=events.filter(e=>!e.m||state.member), n=vis[0], wk=vis.slice(1,4);
   const post=posts.filter(p=>!p.m||state.member)[0];
@@ -199,6 +207,7 @@ function home(){
   :`<div class="card next"><div class="eyebrow">Neste samling</div><h2>Ingen planlagt</h2><div class="meta">Se faste samlinger under Program.</div></div>`}
   ${post?`<div class="alert"><b>${esc(post.t)}</b><span class="small">${esc(post.b)}</span></div>`:''}
   ${wk.length?`<div><h2 style="margin-bottom:10px">Kommer snart</h2><div class="list">${wk.map(evItem).join('')}</div></div>`:''}
+  ${svCard()}
   <div class="card"><h2>Finn frem</h2><p class="small" style="margin:6px 0 0">Adresse: Kometvegen 7, 6419 Molde<br>Kontortid: tirsdag–torsdag kl. 10–16<br>Telefon: <a href="tel:+4771251029">71 25 10 29</a><br>E-post: <a href="mailto:post@sionmolde.no">post@sionmolde.no</a></p></div>`}
 
 function prog(){
@@ -318,6 +327,10 @@ document.addEventListener('submit',async e=>{
   const f=e.target;
   if(f.id==='login'){e.preventDefault();
     try{await FB.login($('#lE').value.trim(),$('#lP').value);state.err=''}catch(er){keep(()=>state.err=authMsg(er.code))}}
+  else if(f.id==='sv'){e.preventDefault();
+    const m=$('#svE').value.trim().toLowerCase();
+    try{await fetch(SV_URL,{method:'POST',mode:'no-cors',body:new URLSearchParams({[SV_ENTRY]:m})});keep(()=>{state.sv='Takk! Du får info om sommerstevnet.';state.svE=''})}
+    catch(er){keep(()=>{state.sv='Kunne ikke melde på. Sjekk nettforbindelsen og prøv igjen.';state.svE=m})}}
   else if(f.id==='adm'){e.preventDefault();
     const t=f.dataset.type,fd=new FormData(f),d={};
     FIELDS[t].forEach(([k,,ty])=>{const b=ty.replace('*','');d[k]=b==='combo'?(fd.get(k+'Sel')==='__annet'?String(fd.get(k)||'').trim():fd.get(k+'Sel')):b==='chk'?fd.has(k):k==='day'?+fd.get(k):String(fd.get(k)||'').trim()});
