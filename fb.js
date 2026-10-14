@@ -37,13 +37,14 @@ try{
     async isMember(email){
       try{return (await S.getDoc(S.doc(db,'members',email))).exists()}catch(e){return false}
     },
-    async listMembers(){
-      const snap=await S.getDocs(S.collection(db,'members'));
-      return snap.docs.map(d=>({...d.data(),id:d.id})).sort((a,b)=>a.id<b.id?-1:1);
+    // Brukere = administratorer (samlingen admins) og medlemmer (samlingen members). Adressen er dokument-ID.
+    async listUsers(){
+      const [m,a]=await Promise.all([S.getDocs(S.collection(db,'members')),S.getDocs(S.collection(db,'admins'))]);
+      return a.docs.map(d=>({id:d.id,role:'admin'})).concat(m.docs.map(d=>({id:d.id,role:'member'}))).sort((x,y)=>x.id<y.id?-1:1);
     },
-    // Setter adressen på medlemslisten, oppretter kontoen med et tilfeldig passord og sender en e-post der brukeren velger passord selv.
-    async addMember(email){
-      await S.setDoc(S.doc(db,'members',email),{email,created:S.serverTimestamp(),by:auth.currentUser.email});
+    // Legger adressen i riktig liste, oppretter kontoen med et tilfeldig passord og sender en e-post der brukeren velger passord selv.
+    async addUser(email,role){
+      await S.setDoc(S.doc(db,role==='admin'?'admins':'members',email),{email,rolle:role==='admin'?'admin':'medlem',created:S.serverTimestamp(),by:auth.currentUser.email});
       const pw=Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b%56]).join('');
       let created=true;
       try{await A.createUserWithEmailAndPassword(secAuth,email,pw);await A.signOut(secAuth)}
@@ -51,7 +52,12 @@ try{
       if(created)await A.sendPasswordResetEmail(auth,email);
       return {created};
     },
-    removeMember:email=>S.deleteDoc(S.doc(db,'members',email)),
+    async setRole(email,role){
+      const to=role==='admin'?'admins':'members',from=role==='admin'?'members':'admins';
+      await S.setDoc(S.doc(db,to,email),{email,rolle:role==='admin'?'admin':'medlem',created:S.serverTimestamp(),by:auth.currentUser.email});
+      await S.deleteDoc(S.doc(db,from,email));
+    },
+    async removeUser(email){await S.deleteDoc(S.doc(db,'members',email));await S.deleteDoc(S.doc(db,'admins',email))},
     async addMany(col,items){
       const b=S.writeBatch(db);
       items.forEach(x=>b.set(S.doc(S.collection(db,col)),{...x,created:S.serverTimestamp()}));

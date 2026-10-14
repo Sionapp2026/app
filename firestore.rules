@@ -19,10 +19,10 @@ service cloud.firestore {
       allow get: if signedIn() && request.auth.token.email == email || isAdmin();
       allow list, write: if isAdmin();
     }
-    // Administratorer legges inn som dokumenter i admins, med e-postadressen som dokument-ID.
+    // Administratorer er dokumenter i admins, med e-postadressen som dokument-ID. Bare administratorer kan endre listen.
     match /admins/{email} {
-      allow get: if signedIn() && request.auth.token.email == email;
-      allow write: if false;
+      allow get: if signedIn() && request.auth.token.email == email || isAdmin();
+      allow list, write: if isAdmin();
     }
   }
 }
