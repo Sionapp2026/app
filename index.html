@@ -33,6 +33,8 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:12p
 :root[data-theme="dark"] .logo-mark img{filter:invert(1)}
 .logo b{font-family:var(--f-display);font-weight:400;text-transform:uppercase;font-size:24px;letter-spacing:.02em;display:block;line-height:1}
 .logo span{font-size:13px;color:var(--muted)}
+dialog{background:var(--surface);color:var(--ink);border:0;border-radius:16px;padding:18px;width:min(92vw,400px);box-shadow:0 10px 30px rgba(0,0,0,.3)}
+dialog::backdrop{background:rgba(5,20,40,.55)}
 .pw{position:relative;display:block}
 .pw input{padding-right:46px}
 .eye{position:absolute;right:2px;top:50%;transform:translateY(-50%);width:42px;height:42px;border:0;background:none;color:var(--muted);display:grid;place-items:center;border-radius:10px}
@@ -117,6 +119,11 @@ nav.tabs svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1
   <main id="view"></main>
   <nav class="tabs" id="tabs"></nav>
 </div>
+<dialog id="rsDlg" aria-labelledby="rsT"><form class="form" id="rs" method="dialog">
+  <h2 id="rsT"></h2><p class="small" style="margin:0">Skriv navnet ditt, så ledere vet hvem som kommer. Ledere kan se navnet ditt.</p>
+  <label class="f">Navn<input id="rsN" name="name" type="text" autocomplete="name" required></label>
+  <label class="f">E-post eller mobil (valgfritt)<input id="rsK" name="contact" type="text" autocomplete="email"></label>
+  <div class="btns"><button class="btn primary" type="submit" style="width:auto">Send</button><button class="btn" type="button" data-rscancel>Avbryt</button></div></form></dialog>
 <div id="push" role="status" aria-live="polite"><div class="logo-mark"><img src="logo-512.png" alt=""></div><div><b id="pushT"></b><span id="pushB"></span></div></div>
 
 <script>
@@ -199,6 +206,27 @@ function evItem(e){
 /* Påmeldingen går til Google Skjema «Sommerstevne påmeldinger nyhetsbrev». Svarene havner i et regneark i Drive,
    og scriptet i regnearket sender e-postvarsel. Google svarer ikke tilbake til nettsider, så vi kan ikke se om det lyktes. */
 const SV_URL='https://docs.google.com/forms/d/e/1FAIpQLScYERloVM4jsoPdXmpeqJYecXNBGl6GNNjNl5vequqCrTvSWw/formResponse',SV_ENTRY='entry.1990573754';
+/* «Jeg kommer»: navn og svar sendes til Google Skjema «Jeg kommer – arrangementer» (regneark i Drive).
+   Tallet som vises i appen telles separat i databasen. Google svarer ikke tilbake, så vi ser ikke om det lyktes. */
+const RS_URL='https://docs.google.com/forms/d/e/1FAIpQLScVKs0aIg8RU7Ess9mFMnKUOHudetvn5AtQIqiIn-OA94rXcg/formResponse';
+const RS={arr:'entry.568243152',dato:'entry.1403655940',navn:'entry.1951632759',kontakt:'entry.722221792',svar:'entry.903786018'};
+const lsGet=k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+let rsPending=null;
+function openRsvp(id){
+  const ev=events.find(x=>x.id==id);if(!ev)return;
+  rsPending=id;$('#rsT').textContent='Jeg kommer: '+ev.title;
+  $('#rsN').value=lsGet('sm-navn');$('#rsK').value=lsGet('sm-kontakt')||(state.user?state.user.email:'');
+  $('#rsDlg').showModal();$('#rsN').focus();
+}
+async function setRsvp(id,on,navn,kontakt){
+  const ev=events.find(x=>x.id==id)||{};
+  keep(()=>{state.rsvp[id]=on;save();if(usingFb)counts[id]=Math.max(0,(counts[id]||0)+(on?1:-1))});
+  const nm=navn||lsGet('sm-navn');
+  if(nm)fetch(RS_URL,{method:'POST',mode:'no-cors',body:new URLSearchParams({[RS.arr]:ev.title||'',[RS.dato]:(ev.start||'')+(ev.end?' – '+ev.end:''),[RS.navn]:nm,[RS.kontakt]:kontakt||lsGet('sm-kontakt'),[RS.svar]:on?'Kommer':'Kommer ikke'})}).catch(()=>{});
+  if(usingFb&&FB)try{await FB.rsvp(id,on?1:-1)}catch(er){keep(()=>{state.rsvp[id]=!on;save();counts[id]=Math.max(0,(counts[id]||0)+(on?-1:1))});push('Kunne ikke lagre svaret','Prøv igjen om litt.')}
+}
+
 function svCard(){
   return `<div class="card"><h2>Sommerstevne</h2><p class="small" style="margin:6px 0 12px">Neste sommerstevne er <b>22.–27. juni 2027</b>. Legg igjen e-posten din for å få mer info.</p>
   <form class="form" id="sv"><label class="f">E-post<input id="svE" type="email" autocomplete="email" required value="${esc(state.svE)}"></label><button class="btn primary" type="submit">Meld meg på</button></form>
@@ -324,9 +352,8 @@ document.addEventListener('click',async e=>{
   else if(c.id==='bellBtn'){state.tab='news';markSeen();render()}
   else if(c.dataset.ev){keep(()=>state.open[c.dataset.ev]=!state.open[c.dataset.ev])}
   else if(c.dataset.rsvp){
-    const id=c.dataset.rsvp,on=!state.rsvp[id];
-    keep(()=>{state.rsvp[id]=on;save();if(usingFb)counts[id]=Math.max(0,(counts[id]||0)+(on?1:-1))});
-    if(usingFb&&FB)try{await FB.rsvp(id,on?1:-1)}catch(er){keep(()=>{state.rsvp[id]=!on;save();counts[id]=Math.max(0,(counts[id]||0)+(on?-1:1))});push('Kunne ikke lagre svaret','Prøv igjen om litt.')}}
+    if(state.rsvp[c.dataset.rsvp])await setRsvp(c.dataset.rsvp,false);else openRsvp(c.dataset.rsvp)}
+  else if('rscancel' in c.dataset){$('#rsDlg').close();rsPending=null}
   else if(c.dataset.f){state.filter=c.dataset.f;keep(()=>{})}
   else if(c.dataset.pref){keep(()=>{state.prefs[c.dataset.pref]=!state.prefs[c.dataset.pref];save()})}
   else if(c.dataset.memdel){
@@ -382,6 +409,11 @@ document.addEventListener('submit',async e=>{
     try{await FB.changePassword(o,n);keep(()=>state.pwMsg='Passordet er endret.');
       try{if(window.PasswordCredential)await navigator.credentials.store(new PasswordCredential({id:state.user.email,password:n,name:state.user.email}))}catch(x){}}
     catch(er){keep(()=>state.pwMsg=er.code==='auth/invalid-credential'||er.code==='auth/wrong-password'?'Nåværende passord er feil.':authMsg(er.code))}}
+  else if(f.id==='rs'){e.preventDefault();
+    const n=$('#rsN').value.trim(),k=$('#rsK').value.trim(),id=rsPending;
+    if(!n||!id)return;
+    lsSet('sm-navn',n);lsSet('sm-kontakt',k);$('#rsDlg').close();rsPending=null;
+    await setRsvp(id,true,n,k);push('Takk, '+n+'!','Vi har registrert at du kommer.')}
   else if(f.id==='sv'){e.preventDefault();
     const m=$('#svE').value.trim().toLowerCase();
     try{await fetch(SV_URL,{method:'POST',mode:'no-cors',body:new URLSearchParams({[SV_ENTRY]:m})});keep(()=>{state.sv='Takk! Du får info om sommerstevnet.';state.svE=''})}
