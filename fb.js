@@ -17,6 +17,8 @@ try{
     login:(e,p)=>A.signInWithEmailAndPassword(auth,e,p),
     logout:()=>A.signOut(auth),
     reset:e=>A.sendPasswordResetEmail(auth,e),
+    // Endring av passord krever at brukeren bekrefter det gamle passordet først.
+    async changePassword(old,nw){const u=auth.currentUser;await A.reauthenticateWithCredential(u,A.EmailAuthProvider.credential(u.email,old));await A.updatePassword(u,nw)},
     // Uinnloggede ber bare om åpent innhold (m == false). Reglene krever det samme.
     async list(col){
       const c=S.collection(db,col);

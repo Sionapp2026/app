@@ -163,7 +163,7 @@ function ago(p){
   const x=new Date(p.ms);return x.getDate()+'. '+MON[x.getMonth()]}
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',adm:{type:'events',edit:null},msg:'',err:''};
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
 state.member=false;state.admin=false;state.user=null;
 const save=()=>{try{localStorage.setItem('sm-proto',JSON.stringify({rsvp:state.rsvp,rem:state.rem,prefs:state.prefs}))}catch(e){}};
@@ -262,7 +262,13 @@ function admin(){
 
 function loginCard(){
   if(state.user)return `<div class="card"><div class="row"><div class="grow"><b>Innlogget som medlem</b><div class="small">${esc(state.user.email)}${state.admin?' · administrator':''}</div></div>
-   <button class="btn" data-logout>Logg ut</button></div></div>`;
+   <button class="btn" data-logout>Logg ut</button></div>
+   <details style="margin-top:12px"${state.pwMsg?' open':''}><summary style="cursor:pointer;font-weight:600">Endre passord</summary>
+   <form class="form" id="pw" style="margin-top:10px"><label class="f">Nåværende passord<input id="pO" type="password" autocomplete="current-password" required></label>
+   <label class="f">Nytt passord (minst 8 tegn)<input id="pN" type="password" autocomplete="new-password" minlength="8" required></label>
+   <label class="f">Gjenta nytt passord<input id="pR" type="password" autocomplete="new-password" minlength="8" required></label>
+   <button class="btn primary" type="submit">Lagre nytt passord</button></form>
+   <p class="small" role="status" style="margin:8px 0 0">${esc(state.pwMsg)}</p></details></div>`;
   return `<div class="card"><h2>Logg inn</h2><p class="small" style="margin:4px 0 12px">For medlemmer og ledere. Du får brukernavn og passord av menigheten.</p>
   ${FB?`<form class="form" id="login"><label class="f">E-post<input id="lE" type="email" autocomplete="username" required></label>
   <label class="f">Passord<input id="lP" type="password" autocomplete="current-password" required></label>
@@ -287,7 +293,7 @@ let pt;
 function push(t,b){$('#pushT').textContent=t;$('#pushB').textContent=b;$('#push').classList.add('show');clearTimeout(pt);pt=setTimeout(()=>$('#push').classList.remove('show'),4500)}
 function keep(fn){const y=scrollY;fn();$('#view').innerHTML=VIEWS[state.tab]();drawTabs();badge();window.scrollTo(0,y)}
 async function refresh(){await load();keep(()=>{})}
-const authMsg=c=>({'auth/invalid-credential':'Feil e-post eller passord.','auth/invalid-email':'Ugyldig e-postadresse.','auth/user-disabled':'Brukeren er sperret.','auth/too-many-requests':'For mange forsøk. Vent litt og prøv igjen.','auth/network-request-failed':'Ingen nettforbindelse.'}[c]||'Noe gikk galt. Prøv igjen.');
+const authMsg=c=>({'auth/invalid-credential':'Feil e-post eller passord.','auth/invalid-email':'Ugyldig e-postadresse.','auth/user-disabled':'Brukeren er sperret.','auth/too-many-requests':'For mange forsøk. Vent litt og prøv igjen.','auth/network-request-failed':'Ingen nettforbindelse.','auth/weak-password':'Passordet er for svakt. Bruk minst 8 tegn.','auth/requires-recent-login':'Logg ut og inn igjen, og prøv på nytt.'}[c]||'Noe gikk galt. Prøv igjen.');
 const saveMsg=c=>c==='permission-denied'?'Du har ikke tilgang til å lagre.':'Kunne ikke lagre ('+(c||'ukjent feil')+').';
 
 document.addEventListener('click',async e=>{
@@ -300,7 +306,7 @@ document.addEventListener('click',async e=>{
     if(state.rem[id])push('Påminnelse lagt inn',events.find(x=>x.id==id).title+' – du får varsel i forkant.')}
   else if(c.dataset.f){state.filter=c.dataset.f;keep(()=>{})}
   else if(c.dataset.pref){keep(()=>{state.prefs[c.dataset.pref]=!state.prefs[c.dataset.pref];save()})}
-  else if('logout' in c.dataset){await FB.logout()}
+  else if('logout' in c.dataset){state.pwMsg='';await FB.logout()}
   else if('reset' in c.dataset){const m=$('#lE').value.trim();
     if(!m){keep(()=>state.err='Skriv inn e-postadressen din først.');return}
     try{await FB.reset(m);keep(()=>state.err='Hvis adressen er registrert, er en lenke for nytt passord sendt.')}catch(er){keep(()=>state.err=authMsg(er.code))}}
@@ -327,6 +333,12 @@ document.addEventListener('submit',async e=>{
   const f=e.target;
   if(f.id==='login'){e.preventDefault();
     try{await FB.login($('#lE').value.trim(),$('#lP').value);state.err=''}catch(er){keep(()=>state.err=authMsg(er.code))}}
+  else if(f.id==='pw'){e.preventDefault();
+    const o=$('#pO').value,n=$('#pN').value,r=$('#pR').value;
+    if(n!==r){keep(()=>state.pwMsg='De to nye passordene er ikke like.');return}
+    if(n===o){keep(()=>state.pwMsg='Det nye passordet må være et annet enn det gamle.');return}
+    try{await FB.changePassword(o,n);keep(()=>state.pwMsg='Passordet er endret.')}
+    catch(er){keep(()=>state.pwMsg=er.code==='auth/invalid-credential'||er.code==='auth/wrong-password'?'Nåværende passord er feil.':authMsg(er.code))}}
   else if(f.id==='sv'){e.preventDefault();
     const m=$('#svE').value.trim().toLowerCase();
     try{await fetch(SV_URL,{method:'POST',mode:'no-cors',body:new URLSearchParams({[SV_ENTRY]:m})});keep(()=>{state.sv='Takk! Du får info om sommerstevnet.';state.svE=''})}
