@@ -223,13 +223,16 @@ function news(){
 const CATS=['Møter','Happeninger','Ungdom'];
 /* [felt, etikett, type, valg]. Stjerne etter typen betyr obligatorisk. */
 const FIELDS={
- events:[['title','Tittel','text*'],['start','Startdato','date*'],['end','Sluttdato (bare for flere dager)','date'],['time','Klokkeslett','time'],['place','Sted','text'],['who','Taler eller hvem','text'],['text','Beskrivelse','area'],['cat','Kategori','sel',CATS],['m','Bare for medlemmer','chk']],
+ events:[['title','Tittel','text*'],['start','Startdato','date*'],['end','Sluttdato (bare for flere dager)','date'],['time','Klokkeslett','time'],['place','Sted','place'],['who','Taler eller hvem','text'],['text','Beskrivelse','area'],['cat','Kategori','sel',CATS],['m','Bare for medlemmer','chk']],
  posts:[['t','Tittel','text*'],['b','Melding','area*'],['tag','Målgruppe','sel',['Alle','Medlem','Ungdom']]],
  regular:[['title','Tittel','text*'],['day','Ukedag','sel',[1,2,3,4,5,6,0]],['time','Klokkeslett','time*'],['note','Merknad','text'],['cat','Kategori','sel',CATS]]};
+const PLACES=['Kometvegen 7','Åndalsnes','Eidsvåg','Eide','Tingvoll'];
 const COL={events:'events',posts:'posts',regular:'regular'};
 const TYPES=[['events','Arrangement'],['posts','Nyhet'],['regular','Fast samling']];
 function fields(t,ed){return FIELDS[t].map(([k,l,ty,o])=>{
   const req=ty.endsWith('*'),b=ty.replace('*',''),v=ed?ed[k]:undefined;
+  if(b==='place'){const known=!v||PLACES.includes(v);
+    return `<label class="f">${l}<select name="placeSel">${PLACES.concat('Annet').map(x=>`<option ${(known?(v||PLACES[0]):'Annet')===x?'selected':''}>${x}</option>`).join('')}</select><input name="place" type="text" placeholder="Skriv inn sted" value="${known?'':esc(v)}" ${known?'hidden':''}></label>`}
   if(b==='area')return `<label class="f">${l}<textarea name="${k}" rows="3" ${req?'required':''}>${esc(v)}</textarea></label>`;
   if(b==='sel')return `<label class="f">${l}<select name="${k}">${o.map(x=>`<option value="${x}" ${String(v==null?o[0]:v)===String(x)?'selected':''}>${k==='day'?cap(DAYS[x]):x}</option>`).join('')}</select></label>`;
   if(b==='chk')return `<label class="f" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="${k}" style="width:auto" ${v?'checked':''}>${l}</label>`;
@@ -311,7 +314,7 @@ document.addEventListener('submit',async e=>{
     try{await FB.login($('#lE').value.trim(),$('#lP').value);state.err=''}catch(er){keep(()=>state.err=authMsg(er.code))}}
   else if(f.id==='adm'){e.preventDefault();
     const t=f.dataset.type,fd=new FormData(f),d={};
-    FIELDS[t].forEach(([k,,ty])=>{const b=ty.replace('*','');d[k]=b==='chk'?fd.has(k):k==='day'?+fd.get(k):String(fd.get(k)||'').trim()});
+    FIELDS[t].forEach(([k,,ty])=>{const b=ty.replace('*','');d[k]=b==='place'?(fd.get('placeSel')==='Annet'?String(fd.get('place')||'').trim():fd.get('placeSel')):b==='chk'?fd.has(k):k==='day'?+fd.get(k):String(fd.get(k)||'').trim()});
     if(t==='posts')d.m=d.tag==='Medlem';
     if(t==='regular')d.m=false;
     if(t==='events')d.m=!!d.m;
@@ -322,6 +325,7 @@ document.addEventListener('submit',async e=>{
     await refresh()}
 });
 
+document.addEventListener('change',e=>{if(e.target.name==='placeSel'){const i=e.target.parentNode.querySelector('input[name=place]');i.hidden=e.target.value!=='Annet';if(!i.hidden)i.focus()}});
 let first=true;
 async function start(){
   FB=await window.fbReady;
