@@ -26,8 +26,10 @@ button{font:inherit;color:inherit;cursor:pointer}
 .app{max-width:440px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;background:var(--bg);position:relative}
 header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 16px 8px;position:sticky;top:env(safe-area-inset-top,0px);background:var(--bg);z-index:5}
 .logo{display:flex;align-items:center;gap:10px;min-width:0}
-.logo-mark{width:46px;height:46px;border-radius:10px;background:#c9e1fb;display:grid;place-items:center;flex:none;padding:3px}
-.logo-mark img{width:100%;height:100%;object-fit:contain}
+.logo-mark{width:40px;height:48px;display:grid;place-items:center;flex:none}
+.logo-mark img{width:100%;height:100%;object-fit:contain;display:block}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .logo-mark img{filter:invert(1)}}
+:root[data-theme="dark"] .logo-mark img{filter:invert(1)}
 .logo b{font-family:var(--f-display);font-weight:400;text-transform:uppercase;font-size:24px;letter-spacing:.02em;display:block;line-height:1}
 .logo span{font-size:13px;color:var(--muted)}
 .bell{position:relative;border:1px solid var(--line);background:var(--surface);width:42px;height:42px;border-radius:50%;display:grid;place-items:center;flex:none}
@@ -94,7 +96,7 @@ nav.tabs button[aria-current="page"]{color:var(--brand)}
 nav.tabs svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #push{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:50%;transform:translate(-50%,-140%);width:calc(100% - 24px);max-width:416px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.25);z-index:20;transition:transform .35s;display:flex;gap:10px;align-items:flex-start}
 #push.show{transform:translate(-50%,0)}
-#push .logo-mark{width:30px;height:30px;font-size:16px;border-radius:8px}
+#push .logo-mark{width:26px;height:32px}
 #push b{display:block;font-size:14px}
 #push span{font-size:14px;color:var(--muted)}
 .theme{border:0;background:none;color:var(--muted);font-size:13px;text-decoration:underline;align-self:center}
