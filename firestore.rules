@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+    // Åpent innhold kan alle lese. Innhold merket m == true krever innlogging.
+    match /{col}/{id} {
+      allow read: if col in ['events', 'posts', 'regular'] && (resource.data.m == false || signedIn());
+      allow write: if col in ['events', 'posts', 'regular'] && isAdmin();
+    }
+    // Administratorer legges inn som dokumenter i admins, med e-postadressen som dokument-ID.
+    match /admins/{email} {
+      allow get: if signedIn() && request.auth.token.email == email;
+      allow write: if false;
+    }
+  }
+}

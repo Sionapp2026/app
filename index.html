@@ -42,7 +42,7 @@ h3{font-size:22px;line-height:1.1}
 .script{font-family:var(--f-script);font-size:26px;color:var(--ink);transform:rotate(-3deg);display:block;margin-top:2px;text-transform:none}
 .hd{display:flex;align-items:flex-end;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .sub{color:var(--muted);margin:4px 0 0}
-.proto{background:var(--lamp-soft);color:var(--ink);border:1px dashed var(--lamp);border-radius:10px;padding:8px 12px;font-size:13px}
+.proto{display:none}
 .card{background:var(--surface);border:0;border-radius:14px;padding:16px;min-width:0}
 .next{background:var(--brand);color:var(--brand-ink);border-color:transparent}
 .next .eyebrow{opacity:.8}
@@ -114,31 +114,57 @@ nav.tabs svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1
 <div id="push" role="status" aria-live="polite"><div class="logo-mark"><img src="logo-512.png" alt=""></div><div><b id="pushT"></b><span id="pushB"></span></div></div>
 
 <script>
+window.fbReady=new Promise(r=>{window._fbRes=r;setTimeout(()=>r(null),8000)});
+</script>
+<script type="module" src="fb.js"></script>
+<script>
 const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const DAYS=['søndag','mandag','tirsdag','onsdag','torsdag','fredag','lørdag'];
 const MON=['jan','feb','mar','apr','mai','jun','jul','aug','sep','okt','nov','des'];
 const now=new Date();
-function inDays(n,h,m){const d=new Date(now);d.setDate(d.getDate()+n);d.setHours(h,m||0,0,0);return d}
-const pad=n=>String(n).padStart(2,'0');
-const hm=d=>pad(d.getHours())+':'+pad(d.getMinutes());
 const cap=s=>s[0].toUpperCase()+s.slice(1);
 $('#today').textContent=cap(DAYS[now.getDay()])+' '+now.getDate()+'. '+MON[now.getMonth()];
 
-/* Data hentes fra data/events.json og data/posts.json. Rediger de filene for å endre innholdet. */
-let events=[],posts=[],regular=[];
+/* Innhold hentes fra Firebase (Firestore). Hvis databasen er tom eller utilgjengelig, brukes
+   JSON-filene i data/ som reserve. Innlogging og adminskjema bruker Firebase Authentication. */
+let FB=null,usingFb=false;
+let events=[],posts=[],regular=[],rawEvents=[];
 const todayStart=new Date(now);todayStart.setHours(0,0,0,0);
-async function load(){
-  const [e,p,g]=await Promise.all([fetch('data/events.json').then(r=>r.json()),fetch('data/posts.json').then(r=>r.json()),fetch('data/regular.json').then(r=>r.json()).catch(()=>[])]);
-  events=e.map(x=>({...x,t:x.title,d:x.text,w:new Date(x.start+'T'+(x.time||'00:00')),e:x.end?new Date(x.end+'T23:59'):null}))
-    .filter(x=>(x.e||x.w)>=todayStart).sort((a,b)=>a.w-b.w);
-  posts=p;
-  regular=g.sort((a,b)=>((a.day+6)%7-(b.day+6)%7)||a.time.localeCompare(b.time));
+let seen=0;try{seen=+localStorage.getItem('sm-seen')||0}catch(e){}
+const markSeen=()=>{seen=Date.now();try{localStorage.setItem('sm-seen',String(seen))}catch(e){}posts.forEach(p=>p.read=true);state.unread=0};
+const isNew=p=>p.ms?p.ms>seen:!!(p.unread&&!p.read);
+const getJson=f=>fetch('data/'+f+'.json').then(r=>r.json());
+async function fetchAll(){
+  if(FB){
+    try{
+      const [e,p,g]=await Promise.all([FB.list('events'),FB.list('posts'),FB.list('regular')]);
+      if(e.length||p.length||g.length){usingFb=true;return [e,p,g]}
+    }catch(err){console.warn('Firestore:',err)}
+  }
+  usingFb=false;
+  return Promise.all([getJson('events'),getJson('posts'),getJson('regular').catch(()=>[])]);
 }
+async function load(){
+  const [e,p,g]=await fetchAll();
+  rawEvents=e;
+  events=e.map(x=>({...x,t:esc(x.title),d:esc(x.text),w:new Date(x.start+'T'+(x.time||'00:00')),e:x.end?new Date(x.end+'T23:59'):null}))
+    .filter(x=>(x.e||x.w)>=todayStart).sort((a,b)=>a.w-b.w);
+  posts=p.slice().sort((a,b)=>(b.ms||0)-(a.ms||0));
+  regular=g.slice().sort((a,b)=>((a.day+6)%7-(b.day+6)%7)||String(a.time).localeCompare(String(b.time)));
+  state.unread=posts.filter(isNew).length;
+}
+function ago(p){
+  if(!p.ms)return p.ago||'';
+  const d=Math.round((todayStart-new Date(p.ms).setHours(0,0,0,0))/864e5);
+  if(d<=0)return 'i dag';if(d===1)return 'i går';if(d<14)return 'for '+d+' dager siden';
+  const x=new Date(p.ms);return x.getDate()+'. '+MON[x.getMonth()]}
 const tm=e=>e.time?' kl. '+e.time:'';
-const state={tab:'home',filter:'Alle',member:false,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:2};
+const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
-const save=()=>{try{localStorage.setItem('sm-proto',JSON.stringify({member:state.member,rsvp:state.rsvp,rem:state.rem,prefs:state.prefs}))}catch(e){}};
+state.member=false;state.admin=false;state.user=null;
+const save=()=>{try{localStorage.setItem('sm-proto',JSON.stringify({rsvp:state.rsvp,rem:state.rem,prefs:state.prefs}))}catch(e){}};
 
 const ICON={
  home:'<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/>',
@@ -155,20 +181,22 @@ function evItem(e){
   if(e.m&&!state.member)return `<div class="item"><div class="locked" style="padding:12px">${dateBox(e)}<div class="grow"><b>${e.t}</b><span class="small">Kun for medlemmer. Logg inn under «Meg».</span></div></div></div>`;
   const open=state.open[e.id],r=state.rsvp[e.id],rem=state.rem[e.id];
   return `<div class="item ${open?'open':''}"><button data-ev="${e.id}" aria-expanded="${!!open}">${dateBox(e)}
-   <div class="grow"><b>${e.t}</b><span class="small">${when(e.w)} ${tm(e)}${e.place?' · '+e.place:''}</span></div>
-   ${e.m?'<span class="tag m">Medlem</span>':`<span class="tag">${e.cat}</span>`}</button>
-   <div class="detail"><div>${e.d}</div><div class="small">${e.who}</div>
+   <div class="grow"><b>${e.t}</b><span class="small">${when(e.w)} ${tm(e)}${e.place?' · '+esc(e.place):''}</span></div>
+   ${e.m?'<span class="tag m">Medlem</span>':`<span class="tag">${esc(e.cat)}</span>`}</button>
+   <div class="detail"><div>${e.d}</div><div class="small">${esc(e.who)}</div>
    <div class="btns"><button class="btn ${r?'on':''}" data-rsvp="${e.id}">${r?'✓ Jeg kommer':'Jeg kommer'}</button>
    <button class="btn ${rem?'on':''}" data-rem="${e.id}">${rem?'Påminnelse på':'Minn meg på det'}</button></div></div></div>`}
 
 function home(){
   const vis=events.filter(e=>!e.m||state.member), n=vis[0], wk=vis.slice(1,4);
+  const post=posts.filter(p=>!p.m||state.member)[0];
   return `<div><h1>Velkommen</h1><span class="script">dette skjer i Sion Molde</span></div>
-  <div class="card next"><div class="eyebrow">Neste samling</div><h2>${n.t}</h2>
-   <div class="meta">${when(n.w)}${tm(n)}${n.place?' · '+n.place:''}</div>
-   <div class="btns" style="margin-top:12px"><button class="btn" style="color:var(--ink)" data-rsvp="${n.id}" data-stay="1">${state.rsvp[n.id]?'✓ Jeg kommer':'Jeg kommer'}</button></div></div>
-  <div class="alert"><b>${posts[0].t}</b><span class="small">${posts[0].b}</span></div>
-  <div><h2 style="margin-bottom:10px">Kommer snart</h2><div class="list">${wk.map(evItem).join('')}</div></div>
+  ${n?`<div class="card next"><div class="eyebrow">Neste samling</div><h2>${n.t}</h2>
+   <div class="meta">${when(n.w)}${tm(n)}${n.place?' · '+esc(n.place):''}</div>
+   <div class="btns" style="margin-top:12px"><button class="btn" style="color:var(--ink)" data-rsvp="${n.id}" data-stay="1">${state.rsvp[n.id]?'✓ Jeg kommer':'Jeg kommer'}</button></div></div>`
+  :`<div class="card next"><div class="eyebrow">Neste samling</div><h2>Ingen planlagt</h2><div class="meta">Se faste samlinger under Program.</div></div>`}
+  ${post?`<div class="alert"><b>${esc(post.t)}</b><span class="small">${esc(post.b)}</span></div>`:''}
+  ${wk.length?`<div><h2 style="margin-bottom:10px">Kommer snart</h2><div class="list">${wk.map(evItem).join('')}</div></div>`:''}
   <div class="card"><h2>Finn frem</h2><p class="small" style="margin:6px 0 0">Adresse: Kometvegen 7, 6419 Molde<br>Kontortid: tirsdag–torsdag kl. 10–16<br>Telefon: <a href="tel:+4771251029">71 25 10 29</a><br>E-post: <a href="mailto:post@sionmolde.no">post@sionmolde.no</a></p></div>`}
 
 function prog(){
@@ -183,58 +211,130 @@ function prog(){
 function regList(){
   const l=regular.filter(r=>state.filter==='Alle'||r.cat===state.filter);
   if(!l.length)return '';
-  return `<div><h2 style="margin-bottom:10px">Faste samlinger</h2><div class="card reg">${l.map(r=>`<div class="r"><div class="d">${cap(DAYS[r.day])}<span>kl. ${r.time}</span></div><div class="grow"><b>${r.title}</b>${r.note?`<span class="small">${r.note}</span>`:''}</div></div>`).join('')}</div></div>`}
+  return `<div><h2 style="margin-bottom:10px">Faste samlinger</h2><div class="card reg">${l.map(r=>`<div class="r"><div class="d">${cap(DAYS[r.day])}<span>kl. ${esc(r.time)}</span></div><div class="grow"><b>${esc(r.title)}</b>${r.note?`<span class="small">${esc(r.note)}</span>`:''}</div></div>`).join('')}</div></div>`}
 
 function news(){
-  return `<h1>Nyheter</h1><div class="list">${posts.map(p=>{
-   if(p.m&&!state.member)return `<div class="card locked"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><div><b style="color:var(--ink)">${p.t}</b><div class="small">Logg inn som medlem for å lese.</div></div></div>`;
-   return `<div class="card post"><div class="head">${p.unread&&!p.read?'<span class="dot" title="Ulest"></span>':''}<span class="tag ${p.m?'m':''}">${p.tag}</span><span class="small">${p.ago}</span></div><h3>${p.t}</h3><div class="small" style="color:var(--ink)">${p.b}</div></div>`}).join('')}</div>`}
+  const l=posts.map(p=>{
+   if(p.m&&!state.member)return `<div class="card locked"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><div><b style="color:var(--ink)">${esc(p.t)}</b><div class="small">Logg inn som medlem for å lese.</div></div></div>`;
+   return `<div class="card post"><div class="head">${isNew(p)?'<span class="dot" title="Ulest"></span>':''}<span class="tag ${p.m?'m':''}">${esc(p.tag)}</span><span class="small">${esc(ago(p))}</span></div><h3>${esc(p.t)}</h3><div class="small" style="color:var(--ink)">${esc(p.b)}</div></div>`}).join('');
+  return `<h1>Nyheter</h1><div class="list">${l||'<p class="small">Ingen nyheter ennå.</p>'}</div>`}
+
+/* ---------- Innlogging og administrasjon ---------- */
+const CATS=['Møter','Happeninger','Ungdom'];
+/* [felt, etikett, type, valg]. Stjerne etter typen betyr obligatorisk. */
+const FIELDS={
+ events:[['title','Tittel','text*'],['start','Startdato','date*'],['end','Sluttdato (bare for flere dager)','date'],['time','Klokkeslett','time'],['place','Sted','text'],['who','Taler eller hvem','text'],['text','Beskrivelse','area'],['cat','Kategori','sel',CATS],['m','Bare for medlemmer','chk']],
+ posts:[['t','Tittel','text*'],['b','Melding','area*'],['tag','Målgruppe','sel',['Alle','Medlem','Ungdom']]],
+ regular:[['title','Tittel','text*'],['day','Ukedag','sel',[1,2,3,4,5,6,0]],['time','Klokkeslett','time*'],['note','Merknad','text'],['cat','Kategori','sel',CATS]]};
+const COL={events:'events',posts:'posts',regular:'regular'};
+const TYPES=[['events','Arrangement'],['posts','Nyhet'],['regular','Fast samling']];
+function fields(t,ed){return FIELDS[t].map(([k,l,ty,o])=>{
+  const req=ty.endsWith('*'),b=ty.replace('*',''),v=ed?ed[k]:undefined;
+  if(b==='area')return `<label class="f">${l}<textarea name="${k}" rows="3" ${req?'required':''}>${esc(v)}</textarea></label>`;
+  if(b==='sel')return `<label class="f">${l}<select name="${k}">${o.map(x=>`<option value="${x}" ${String(v==null?o[0]:v)===String(x)?'selected':''}>${k==='day'?cap(DAYS[x]):x}</option>`).join('')}</select></label>`;
+  if(b==='chk')return `<label class="f" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="${k}" style="width:auto" ${v?'checked':''}>${l}</label>`;
+  return `<label class="f">${l}<input name="${k}" type="${b}" ${req?'required':''} value="${esc(v)}"></label>`}).join('')}
+function admItems(t){return t==='events'?rawEvents.slice().sort((a,b)=>a.start<b.start?-1:1):t==='posts'?posts:regular}
+function admLabel(t,x){return t==='events'?`${esc(x.start)} · ${esc(x.title)}`:t==='posts'?esc(x.t):`${cap(DAYS[x.day])} ${esc(x.time)} · ${esc(x.title)}`}
+function admin(){
+  const t=state.adm.type,items=admItems(t),ed=state.adm.edit?items.find(x=>x.id==state.adm.edit):null;
+  return `<div class="card"><h2>Administrator</h2>
+  ${usingFb?'':`<p class="small" style="margin:8px 0">Databasen er tom, og appen viser innholdet fra JSON-filene. Flytt det over først, ellers forsvinner det når du legger til noe nytt.</p><button class="btn" data-aimport>Flytt eksisterende innhold til databasen</button>`}
+  <div class="chips" style="margin:12px 0">${TYPES.map(([k,l])=>`<button class="chip" data-at="${k}" aria-pressed="${t===k}">${l}</button>`).join('')}</div>
+  <form class="form" id="adm" data-type="${t}">${fields(t,ed)}
+   <div class="btns"><button class="btn primary" type="submit" style="width:auto">${ed?'Lagre endring':'Legg til'}</button>${ed?'<button class="btn" type="button" data-acancel>Avbryt</button>':''}</div></form>
+  <p class="small" role="status" style="margin:8px 0 0">${esc(state.msg)}</p></div>
+  <div class="card"><h3 style="margin-bottom:6px">Eksisterende</h3><div class="reg">${items.map(x=>`<div class="r"><div class="grow">${admLabel(t,x)}</div><button class="btn" data-aedit="${x.id}">Rediger</button><button class="btn" data-adel="${x.id}">Slett</button></div>`).join('')||'<p class="small">Ingenting ennå.</p>'}</div></div>`}
+
+function loginCard(){
+  if(state.user)return `<div class="card"><div class="row"><div class="grow"><b>Innlogget som medlem</b><div class="small">${esc(state.user.email)}${state.admin?' · administrator':''}</div></div>
+   <button class="btn" data-logout>Logg ut</button></div></div>`;
+  return `<div class="card"><h2>Logg inn</h2><p class="small" style="margin:4px 0 12px">For medlemmer og ledere. Du får brukernavn og passord av menigheten.</p>
+  ${FB?`<form class="form" id="login"><label class="f">E-post<input id="lE" type="email" autocomplete="username" required></label>
+  <label class="f">Passord<input id="lP" type="password" autocomplete="current-password" required></label>
+  <button class="btn primary" type="submit">Logg inn</button><button class="theme" type="button" data-reset>Glemt passord?</button></form>
+  <p class="small" role="status" style="margin:8px 0 0">${esc(state.err)}</p>`:'<p class="small">Innlogging er ikke tilgjengelig akkurat nå.</p>'}</div>`}
 
 function me(){
   const sw=(k,l,s)=>`<div class="switch"><div><b>${l}</b><div class="small">${s}</div></div><button class="tg" role="switch" aria-checked="${state.prefs[k]}" aria-label="${l}" data-pref="${k}"></button></div>`;
-  return `<h1>Meg</h1>
-  <div class="card"><div class="row"><div class="grow"><b>${state.member?'Innlogget som medlem':'Besøkende'}</b><div class="small">${state.member?'Du ser intern informasjon og medlemsmøter.':'Logg inn for å se intern informasjon.'}</div></div>
-  <button class="btn ${state.member?'':'primary'}" style="${state.member?'':'width:auto;padding:10px 16px;font-size:14px'}" data-login>${state.member?'Logg ut':'Logg inn'}</button></div>
-  <p class="small" style="margin:8px 0 0">I den ferdige appen: engangskode på SMS.</p></div>
+  return `<h1>Meg</h1>${loginCard()}
   <div class="card"><h2>Varsler</h2>${sw('Møter','Møter','Påminnelse før hvert møte')}${sw('Happeninger','Happeninger','Konserter, dugnader og turer')}${sw('Ungdom','Ungdom','Bare for ungdomsgruppa')}${sw('Viktig','Viktige meldinger','Endringer og avlysninger')}</div>
-  <div class="card"><h2>Administrator (demo)</h2><p class="small" style="margin:4px 0 12px">Slik sender en leder ut en melding. Du får varselet på denne telefonen.</p>
-  <form class="form" id="adm"><label class="f">Tittel<input id="aT" value="Møtet i kveld er flyttet til kl. 19:00" required></label>
-  <label class="f">Melding<textarea id="aB" rows="2">Vi starter en halvtime senere på grunn av øving.</textarea></label>
-  <label class="f">Målgruppe<select id="aG"><option>Alle</option><option>Kun medlemmer</option><option>Ungdom</option></select></label>
-  <button class="btn primary" type="submit">Send varsel</button></form></div>
+  ${state.admin?admin():''}
   <button class="theme" id="thm">Bytt lys/mørk visning</button>`}
 
-function render(){
-  drawTabs();
-  $('#view').innerHTML={home,prog,news,me}[state.tab]();
-  $('#badge').textContent=state.unread;$('#badge').hidden=!state.unread;
-  window.scrollTo(0,0);
-}
+const VIEWS={home,prog,news,me};
+function badge(){$('#badge').textContent=state.unread;$('#badge').hidden=!state.unread}
+function render(){drawTabs();$('#view').innerHTML=VIEWS[state.tab]();badge();window.scrollTo(0,0)}
 let pt;
 function push(t,b){$('#pushT').textContent=t;$('#pushB').textContent=b;$('#push').classList.add('show');clearTimeout(pt);pt=setTimeout(()=>$('#push').classList.remove('show'),4500)}
-function keep(fn){const y=scrollY;fn();const v=$('#view');v.innerHTML={home,prog,news,me}[state.tab]();drawTabs();window.scrollTo(0,y)}
+function keep(fn){const y=scrollY;fn();$('#view').innerHTML=VIEWS[state.tab]();drawTabs();badge();window.scrollTo(0,y)}
+async function refresh(){await load();keep(()=>{})}
+const authMsg=c=>({'auth/invalid-credential':'Feil e-post eller passord.','auth/invalid-email':'Ugyldig e-postadresse.','auth/user-disabled':'Brukeren er sperret.','auth/too-many-requests':'For mange forsøk. Vent litt og prøv igjen.','auth/network-request-failed':'Ingen nettforbindelse.'}[c]||'Noe gikk galt. Prøv igjen.');
+const saveMsg=c=>c==='permission-denied'?'Du har ikke tilgang til å lagre.':'Kunne ikke lagre ('+(c||'ukjent feil')+').';
 
-document.addEventListener('click',e=>{
+document.addEventListener('click',async e=>{
   const c=e.target.closest('button');if(!c)return;
-  if(c.dataset.t){state.tab=c.dataset.t;if(state.tab==='news'){state.unread=0;posts.forEach(p=>p.read=true)}render()}
-  else if(c.id==='bellBtn'){state.tab='news';state.unread=0;posts.forEach(p=>p.read=true);render()}
+  if(c.dataset.t){state.tab=c.dataset.t;if(state.tab==='news')markSeen();render()}
+  else if(c.id==='bellBtn'){state.tab='news';markSeen();render()}
   else if(c.dataset.ev){keep(()=>state.open[c.dataset.ev]=!state.open[c.dataset.ev])}
   else if(c.dataset.rsvp){keep(()=>{state.rsvp[c.dataset.rsvp]=!state.rsvp[c.dataset.rsvp];save()})}
   else if(c.dataset.rem){const id=c.dataset.rem;keep(()=>{state.rem[id]=!state.rem[id];save()});
-    if(state.rem[id])push('Påminnelse lagt inn',events.find(x=>x.id==id).t+' – du får varsel i forkant.')}
+    if(state.rem[id])push('Påminnelse lagt inn',events.find(x=>x.id==id).title+' – du får varsel i forkant.')}
   else if(c.dataset.f){state.filter=c.dataset.f;keep(()=>{})}
   else if(c.dataset.pref){keep(()=>{state.prefs[c.dataset.pref]=!state.prefs[c.dataset.pref];save()})}
-  else if('login' in c.dataset){keep(()=>{state.member=!state.member;save()})}
+  else if('logout' in c.dataset){await FB.logout()}
+  else if('reset' in c.dataset){const m=$('#lE').value.trim();
+    if(!m){keep(()=>state.err='Skriv inn e-postadressen din først.');return}
+    try{await FB.reset(m);keep(()=>state.err='Hvis adressen er registrert, er en lenke for nytt passord sendt.')}catch(er){keep(()=>state.err=authMsg(er.code))}}
+  else if(c.dataset.at){keep(()=>{state.adm={type:c.dataset.at,edit:null};state.msg=''})}
+  else if(c.dataset.aedit){keep(()=>{state.adm.edit=c.dataset.aedit;state.msg=''})}
+  else if('acancel' in c.dataset){keep(()=>{state.adm.edit=null;state.msg=''})}
+  else if(c.dataset.adel){
+    if(!confirm('Slette denne oppføringen?'))return;
+    try{await FB.del(COL[state.adm.type],c.dataset.adel);state.msg='Slettet.';state.adm.edit=null}catch(er){state.msg=saveMsg(er.code)}
+    await refresh()}
+  else if('aimport' in c.dataset){
+    c.disabled=true;
+    try{
+      const [ev,rg]=await Promise.all([getJson('events'),getJson('regular').catch(()=>[])]);
+      const up=ev.filter(x=>new Date((x.end||x.start)+'T23:59')>=todayStart).map(x=>({title:x.title,start:x.start,end:x.end||'',time:x.time||'',place:x.place||'',who:x.who||'',text:x.text||'',cat:x.cat||'Møter',m:!!x.m}));
+      await FB.addMany('events',up);
+      await FB.addMany('regular',rg.map(x=>({day:x.day,time:x.time,title:x.title,note:x.note||'',cat:x.cat||'Møter',m:false})));
+      state.msg='Innholdet er flyttet til databasen.'
+    }catch(er){state.msg=saveMsg(er.code)}
+    await refresh()}
   else if(c.id==='thm'){const r=document.documentElement;const dark=(r.dataset.theme||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light'))==='dark';r.dataset.theme=dark?'light':'dark'}
 });
-document.addEventListener('submit',e=>{
-  if(e.target.id!=='adm')return;e.preventDefault();
-  const t=$('#aT').value.trim(),b=$('#aB').value.trim(),g=$('#aG').value;
-  posts.unshift({id:Date.now(),t,b,ago:'nå',tag:g==='Alle'?'Alle':g==='Ungdom'?'Ungdom':'Medlem',m:g==='Kun medlemmer',unread:true});
-  state.unread++;keep(()=>{});$('#badge').textContent=state.unread;$('#badge').hidden=false;
-  push(t,b);
+document.addEventListener('submit',async e=>{
+  const f=e.target;
+  if(f.id==='login'){e.preventDefault();
+    try{await FB.login($('#lE').value.trim(),$('#lP').value);state.err=''}catch(er){keep(()=>state.err=authMsg(er.code))}}
+  else if(f.id==='adm'){e.preventDefault();
+    const t=f.dataset.type,fd=new FormData(f),d={};
+    FIELDS[t].forEach(([k,,ty])=>{const b=ty.replace('*','');d[k]=b==='chk'?fd.has(k):k==='day'?+fd.get(k):String(fd.get(k)||'').trim()});
+    if(t==='posts')d.m=d.tag==='Medlem';
+    if(t==='regular')d.m=false;
+    if(t==='events')d.m=!!d.m;
+    try{
+      if(state.adm.edit)await FB.set(COL[t],state.adm.edit,d);else await FB.add(COL[t],d);
+      state.msg='Lagret.';state.adm.edit=null;usingFb=true;
+    }catch(er){state.msg=saveMsg(er.code);keep(()=>{});return}
+    await refresh()}
 });
-load().then(render).catch(()=>{$('#view').textContent='Kunne ikke laste program. Prøv igjen senere.'});
+
+let first=true;
+async function start(){
+  FB=await window.fbReady;
+  const go=async u=>{
+    state.user=u||null;state.member=!!u;
+    state.admin=u?await FB.isAdmin(u.email):false;
+    await load();
+    if(first){first=false;render()}else keep(()=>{});
+  };
+  if(FB)FB.onAuth(u=>go(u).catch(()=>{$('#view').textContent='Kunne ikke laste program. Prøv igjen senere.'}));
+  else{await load();render()}
+}
+start().catch(()=>{$('#view').textContent='Kunne ikke laste program. Prøv igjen senere.'});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 </body></html>
