@@ -135,7 +135,7 @@ $('#today').textContent=cap(DAYS[now.getDay()])+' '+now.getDate()+'. '+MON[now.g
 /* Innhold hentes fra Firebase (Firestore). Hvis databasen er tom eller utilgjengelig, brukes
    JSON-filene i data/ som reserve. Innlogging og adminskjema bruker Firebase Authentication. */
 let FB=null,usingFb=false;
-let events=[],posts=[],regular=[],rawEvents=[],members=[];
+let events=[],posts=[],regular=[],rawEvents=[],members=[],counts={};
 const todayStart=new Date(now);todayStart.setHours(0,0,0,0);
 let seen=0;try{seen=+localStorage.getItem('sm-seen')||0}catch(e){}
 const markSeen=()=>{seen=Date.now();try{localStorage.setItem('sm-seen',String(seen))}catch(e){}posts.forEach(p=>p.read=true);state.unread=0};
@@ -158,6 +158,7 @@ async function load(){
     .filter(x=>(x.e||x.w)>=todayStart).sort((a,b)=>a.w-b.w);
   posts=p.slice().sort((a,b)=>(b.ms||0)-(a.ms||0));
   regular=g.slice().sort((a,b)=>((a.day+6)%7-(b.day+6)%7)||String(a.time).localeCompare(String(b.time)));
+  counts=usingFb&&FB?await FB.counts().catch(()=>({})):{};
   members=state.admin&&FB?await FB.listUsers().catch(()=>[]):[];
   state.unread=posts.filter(isNew).length;
 }
@@ -166,6 +167,7 @@ function ago(p){
   const d=Math.round((todayStart-new Date(p.ms).setHours(0,0,0,0))/864e5);
   if(d<=0)return 'i dag';if(d===1)return 'i går';if(d<14)return 'for '+d+' dager siden';
   const x=new Date(p.ms);return x.getDate()+'. '+MON[x.getMonth()]}
+const cnt=id=>counts[id]>0?`<div class="small">${counts[id]} kommer</div>`:'';
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
   prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
@@ -186,13 +188,13 @@ function when(d){const diff=Math.round((new Date(d).setHours(0,0,0,0)-new Date(n
 function dateBox(ev){const d=ev.w,e=ev.e;const m=cap(MON[d.getMonth()]);const s=e&&e.getTime()!==new Date(d).setHours(23,59,0,0)?`${d.getDate()}.${e.getMonth()===d.getMonth()?'-'+e.getDate()+'. '+m:' '+m+'-'+e.getDate()+'. '+cap(MON[e.getMonth()])}`:`${d.getDate()}. ${m}`;return `<div class="date">${s.replace('.-','.–')}</div>`}
 function evItem(e){
   if(e.m&&!state.member)return `<div class="item"><div class="locked" style="padding:12px">${dateBox(e)}<div class="grow"><b>${e.t}</b><span class="small">Kun for medlemmer. Logg inn under «Meg».</span></div></div></div>`;
-  const open=state.open[e.id],r=state.rsvp[e.id],rem=state.rem[e.id];
+  const open=state.open[e.id],r=state.rsvp[e.id];
   return `<div class="item ${open?'open':''}"><button data-ev="${e.id}" aria-expanded="${!!open}">${dateBox(e)}
    <div class="grow"><b>${e.t}</b><span class="small">${when(e.w)} ${tm(e)}${e.place?' · '+esc(e.place):''}</span></div>
    ${e.m?'<span class="tag m">Medlem</span>':`<span class="tag">${esc(e.cat)}</span>`}</button>
    <div class="detail"><div>${e.d}</div><div class="small">${esc(e.who)}</div>
    <div class="btns"><button class="btn ${r?'on':''}" data-rsvp="${e.id}">${r?'✓ Jeg kommer':'Jeg kommer'}</button>
-   <button class="btn ${rem?'on':''}" data-rem="${e.id}">${rem?'Påminnelse på':'Minn meg på det'}</button></div></div></div>`}
+   </div>${cnt(e.id)}</div></div>`}
 
 /* Påmeldingen går til Google Skjema «Sommerstevne påmeldinger nyhetsbrev». Svarene havner i et regneark i Drive,
    og scriptet i regnearket sender e-postvarsel. Google svarer ikke tilbake til nettsider, så vi kan ikke se om det lyktes. */
@@ -208,7 +210,7 @@ function home(){
   return `<div><h1>Velkommen</h1><span class="script">dette skjer i Sion Molde</span></div>
   ${n?`<div class="card next"><div class="eyebrow">Neste samling</div><h2>${n.t}</h2>
    <div class="meta">${when(n.w)}${tm(n)}${n.place?' · '+esc(n.place):''}</div>
-   <div class="btns" style="margin-top:12px"><button class="btn" style="color:var(--ink)" data-rsvp="${n.id}" data-stay="1">${state.rsvp[n.id]?'✓ Jeg kommer':'Jeg kommer'}</button></div></div>`
+   <div class="btns" style="margin-top:12px"><button class="btn" style="color:var(--ink)" data-rsvp="${n.id}" data-stay="1">${state.rsvp[n.id]?'✓ Jeg kommer':'Jeg kommer'}</button></div>${counts[n.id]>0?`<div class="meta" style="margin-top:8px">${counts[n.id]} kommer</div>`:''}</div>`
   :`<div class="card next"><div class="eyebrow">Neste samling</div><h2>Ingen planlagt</h2><div class="meta">Se faste samlinger under Program.</div></div>`}
   ${post?`<div class="alert"><b>${esc(post.t)}</b><span class="small">${esc(post.b)}</span></div>`:''}
   ${wk.length?`<div><h2 style="margin-bottom:10px">Kommer snart</h2><div class="list">${wk.map(evItem).join('')}</div></div>`:''}
@@ -298,7 +300,7 @@ function loginCard(){
 function me(){
   const sw=(k,l,s)=>`<div class="switch"><div><b>${l}</b><div class="small">${s}</div></div><button class="tg" role="switch" aria-checked="${state.prefs[k]}" aria-label="${l}" data-pref="${k}"></button></div>`;
   return `<h1>Meg</h1>${loginCard()}
-  <div class="card"><h2>Varsler</h2>${sw('Møter','Møter','Påminnelse før hvert møte')}${sw('Happeninger','Happeninger','Konserter, dugnader og turer')}${sw('Ungdom','Ungdom','Bare for ungdomsgruppa')}${sw('Viktig','Viktige meldinger','Endringer og avlysninger')}</div>
+
   ${state.admin?admin()+memberCard():''}`}
 
 const VIEWS={home,prog,news,me};
@@ -321,9 +323,10 @@ document.addEventListener('click',async e=>{
   if(c.dataset.t){state.tab=c.dataset.t;if(state.tab==='news')markSeen();render()}
   else if(c.id==='bellBtn'){state.tab='news';markSeen();render()}
   else if(c.dataset.ev){keep(()=>state.open[c.dataset.ev]=!state.open[c.dataset.ev])}
-  else if(c.dataset.rsvp){keep(()=>{state.rsvp[c.dataset.rsvp]=!state.rsvp[c.dataset.rsvp];save()})}
-  else if(c.dataset.rem){const id=c.dataset.rem;keep(()=>{state.rem[id]=!state.rem[id];save()});
-    if(state.rem[id])push('Påminnelse lagt inn',events.find(x=>x.id==id).title+' – du får varsel i forkant.')}
+  else if(c.dataset.rsvp){
+    const id=c.dataset.rsvp,on=!state.rsvp[id];
+    keep(()=>{state.rsvp[id]=on;save();if(usingFb)counts[id]=Math.max(0,(counts[id]||0)+(on?1:-1))});
+    if(usingFb&&FB)try{await FB.rsvp(id,on?1:-1)}catch(er){keep(()=>{state.rsvp[id]=!on;save();counts[id]=Math.max(0,(counts[id]||0)+(on?-1:1))});push('Kunne ikke lagre svaret','Prøv igjen om litt.')}}
   else if(c.dataset.f){state.filter=c.dataset.f;keep(()=>{})}
   else if(c.dataset.pref){keep(()=>{state.prefs[c.dataset.pref]=!state.prefs[c.dataset.pref];save()})}
   else if(c.dataset.memdel){
@@ -348,7 +351,7 @@ document.addEventListener('click',async e=>{
   else if('acancel' in c.dataset){keep(()=>{state.adm.edit=null;state.msg=''})}
   else if(c.dataset.adel){
     if(!confirm('Slette denne oppføringen?'))return;
-    try{await FB.del(COL[state.adm.type],c.dataset.adel);state.msg='Slettet.';state.adm.edit=null}catch(er){state.msg=saveMsg(er.code)}
+    try{await FB.del(COL[state.adm.type],c.dataset.adel);if(state.adm.type==='events')await FB.del('rsvpCounts',c.dataset.adel).catch(()=>{});state.msg='Slettet.';state.adm.edit=null}catch(er){state.msg=saveMsg(er.code)}
     await refresh()}
   else if('aimport' in c.dataset){
     c.disabled=true;

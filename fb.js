@@ -35,6 +35,13 @@ try{
     add:(col,data)=>S.addDoc(S.collection(db,col),{...data,created:S.serverTimestamp()}),
     set:(col,id,data)=>S.setDoc(S.doc(db,col,id),data,{merge:true}),
     del:(col,id)=>S.deleteDoc(S.doc(db,col,id)),
+    // «Jeg kommer»: en anonym teller per arrangement. Ingen navn lagres, bare antallet.
+    async counts(){const snap=await S.getDocs(S.collection(db,'rsvpCounts'));const o={};snap.docs.forEach(d=>o[d.id]=d.data().n||0);return o},
+    async rsvp(id,delta){
+      const ref=S.doc(db,'rsvpCounts',id),s=await S.getDoc(ref);
+      if(s.exists())await S.updateDoc(ref,{n:S.increment(delta)});
+      else if(delta>0)await S.setDoc(ref,{n:1});
+    },
     async isMember(email){
       try{return (await S.getDoc(S.doc(db,'members',email))).exists()}catch(e){return false}
     },
