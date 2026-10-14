@@ -328,7 +328,7 @@ function loginCard(){
 function me(){
   const sw=(k,l,s)=>`<div class="switch"><div><b>${l}</b><div class="small">${s}</div></div><button class="tg" role="switch" aria-checked="${state.prefs[k]}" aria-label="${l}" data-pref="${k}"></button></div>`;
   return `<h1>Meg</h1>${loginCard()}
-  <div class="card"><h2>Medlem i flere menigheter?</h2><p class="small" style="margin:6px 0 0">Dobbelt medlemskap bør ikke forekomme, blant annet på grunn av statsstøtten. <a href="https://person.brreg.no/nb/minside/tros-og-livssyn" target="_blank" rel="noopener">Sjekk hos Brønnøysundregistrene her</a>.</p></div>
+  <div class="card"><h2>Medlem i flere menigheter?</h2><p class="small" style="margin:6px 0 0">Vi ønsker at hver enkelt bare er registrert som medlem ett sted, blant annet fordi det har betydning for statsstøtten til menighetene. Du kan se hvor du er registrert hos <a href="https://person.brreg.no/nb/minside/tros-og-livssyn" target="_blank" rel="noopener">Brønnøysundregistrene</a>. Takk for hjelpen!</p></div>
 
   ${state.admin?admin()+memberCard():''}`}
 
