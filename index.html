@@ -328,7 +328,7 @@ function loginCard(){
 function me(){
   const sw=(k,l,s)=>`<div class="switch"><div><b>${l}</b><div class="small">${s}</div></div><button class="tg" role="switch" aria-checked="${state.prefs[k]}" aria-label="${l}" data-pref="${k}"></button></div>`;
   return `<h1>Meg</h1>${loginCard()}
-  <div class="card"><h2>Medlem i flere menigheter?</h2><p class="small" style="margin:6px 0 0">Mange medlemmer står registrert i andre menigheter enn Sion, og da mister vi statsstøtten for dem. <a href="https://person.brreg.no/nb/minside/tros-og-livssyn" target="_blank" rel="noopener">Sjekk her om du er medlem andre steder</a>. Takk for hjelpen!</p></div>
+  ${state.user?`<div class="card"><h2>Medlem i flere menigheter?</h2><p class="small" style="margin:6px 0 0">Mange medlemmer står registrert i andre menigheter enn Sion, og da mister vi statsstøtten for dem. <a href="https://person.brreg.no/nb/minside/tros-og-livssyn" target="_blank" rel="noopener">Sjekk her om du er medlem andre steder</a>. Takk for hjelpen!</p></div>`:''}
 
   ${state.admin?admin()+memberCard():''}`}
 
