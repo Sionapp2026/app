@@ -11,7 +11,10 @@ try{
     messagingSenderId:"792770444668",
     appId:"1:792770444668:web:ee5b9814f1190666adf8f9"});
   const auth=A.getAuth(app),db=S.getFirestore(app);
+  // Egen forekomst brukes til å opprette brukere, slik at administratoren ikke logges ut av seg selv.
+  const secAuth=A.getAuth(initializeApp(app.options,'oppretter'));
   const FB={
+    full:false,   // true for medlemmer og administratorer: da hentes også medlemsinnhold
     get user(){return auth.currentUser},
     onAuth:cb=>A.onAuthStateChanged(auth,cb),
     login:(e,p)=>A.signInWithEmailAndPassword(auth,e,p),
@@ -22,7 +25,7 @@ try{
     // Uinnloggede ber bare om åpent innhold (m == false). Reglene krever det samme.
     async list(col){
       const c=S.collection(db,col);
-      const snap=await S.getDocs(auth.currentUser?c:S.query(c,S.where('m','==',false)));
+      const snap=await S.getDocs(FB.full?c:S.query(c,S.where('m','==',false)));
       return snap.docs.map(d=>{const x=d.data();return {...x,id:d.id,ms:x.created&&x.created.toMillis?x.created.toMillis():0}});
     },
     async isAdmin(email){
@@ -31,6 +34,24 @@ try{
     add:(col,data)=>S.addDoc(S.collection(db,col),{...data,created:S.serverTimestamp()}),
     set:(col,id,data)=>S.setDoc(S.doc(db,col,id),data,{merge:true}),
     del:(col,id)=>S.deleteDoc(S.doc(db,col,id)),
+    async isMember(email){
+      try{return (await S.getDoc(S.doc(db,'members',email))).exists()}catch(e){return false}
+    },
+    async listMembers(){
+      const snap=await S.getDocs(S.collection(db,'members'));
+      return snap.docs.map(d=>({...d.data(),id:d.id})).sort((a,b)=>a.id<b.id?-1:1);
+    },
+    // Setter adressen på medlemslisten, oppretter kontoen med et tilfeldig passord og sender en e-post der brukeren velger passord selv.
+    async addMember(email){
+      await S.setDoc(S.doc(db,'members',email),{email,created:S.serverTimestamp(),by:auth.currentUser.email});
+      const pw=Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b%56]).join('');
+      let created=true;
+      try{await A.createUserWithEmailAndPassword(secAuth,email,pw);await A.signOut(secAuth)}
+      catch(e){if(e.code==='auth/email-already-in-use')created=false;else throw e}
+      if(created)await A.sendPasswordResetEmail(auth,email);
+      return {created};
+    },
+    removeMember:email=>S.deleteDoc(S.doc(db,'members',email)),
     async addMany(col,items){
       const b=S.writeBatch(db);
       items.forEach(x=>b.set(S.doc(S.collection(db,col)),{...x,created:S.serverTimestamp()}));

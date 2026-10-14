@@ -5,10 +5,19 @@ service cloud.firestore {
     function isAdmin() {
       return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
     }
-    // Åpent innhold kan alle lese. Innhold merket m == true krever innlogging.
+    // Medlem: står på medlemslisten (samlingen members), eller er administrator.
+    function isMember() {
+      return signedIn() && (isAdmin() || exists(/databases/$(database)/documents/members/$(request.auth.token.email)));
+    }
+    // Åpent innhold kan alle lese. Innhold merket m == true krever at brukeren er medlem.
     match /{col}/{id} {
-      allow read: if col in ['events', 'posts', 'regular'] && (resource.data.m == false || signedIn());
+      allow read: if col in ['events', 'posts', 'regular'] && (resource.data.m == false || isMember());
       allow write: if col in ['events', 'posts', 'regular'] && isAdmin();
+    }
+    // Medlemslisten: e-postadressen er dokument-ID. Brukeren kan sjekke sin egen adresse, administratorer styrer listen.
+    match /members/{email} {
+      allow get: if signedIn() && request.auth.token.email == email || isAdmin();
+      allow list, write: if isAdmin();
     }
     // Administratorer legges inn som dokumenter i admins, med e-postadressen som dokument-ID.
     match /admins/{email} {

@@ -134,7 +134,7 @@ $('#today').textContent=cap(DAYS[now.getDay()])+' '+now.getDate()+'. '+MON[now.g
 /* Innhold hentes fra Firebase (Firestore). Hvis databasen er tom eller utilgjengelig, brukes
    JSON-filene i data/ som reserve. Innlogging og adminskjema bruker Firebase Authentication. */
 let FB=null,usingFb=false;
-let events=[],posts=[],regular=[],rawEvents=[];
+let events=[],posts=[],regular=[],rawEvents=[],members=[];
 const todayStart=new Date(now);todayStart.setHours(0,0,0,0);
 let seen=0;try{seen=+localStorage.getItem('sm-seen')||0}catch(e){}
 const markSeen=()=>{seen=Date.now();try{localStorage.setItem('sm-seen',String(seen))}catch(e){}posts.forEach(p=>p.read=true);state.unread=0};
@@ -157,6 +157,7 @@ async function load(){
     .filter(x=>(x.e||x.w)>=todayStart).sort((a,b)=>a.w-b.w);
   posts=p.slice().sort((a,b)=>(b.ms||0)-(a.ms||0));
   regular=g.slice().sort((a,b)=>((a.day+6)%7-(b.day+6)%7)||String(a.time).localeCompare(String(b.time)));
+  members=state.admin&&FB?await FB.listMembers().catch(()=>[]):[];
   state.unread=posts.filter(isNew).length;
 }
 function ago(p){
@@ -166,7 +167,7 @@ function ago(p){
   const x=new Date(p.ms);return x.getDate()+'. '+MON[x.getMonth()]}
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',adm:{type:'events',edit:null},msg:'',err:''};
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',memMsg:'',memE:'',adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
 state.member=false;state.admin=false;state.user=null;
 const save=()=>{try{localStorage.setItem('sm-proto',JSON.stringify({rsvp:state.rsvp,rem:state.rem,prefs:state.prefs}))}catch(e){}};
@@ -266,8 +267,16 @@ function admin(){
 const EYE='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYEOFF='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.7C3.7 8.5 2 12 2 12s3.6 7 10 7c1.6 0 3-.4 4.3-1M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
 const pwField=(id,label,ac,extra)=>`<label class="f">${label}<span class="pw"><input id="${id}" type="password" autocomplete="${ac}" ${extra||''} required><button type="button" class="eye" data-eye aria-label="Vis passord" aria-pressed="false">${EYE}</button></span></label>`;
+function memberCard(){
+  return `<div class="card"><h3 style="margin-bottom:6px">Medlemmer (${members.length})</h3>
+  <p class="small" style="margin:0 0 10px">Skriv inn e-postadressen. Personen får en e-post og velger passord selv.</p>
+  <form class="form" id="mem"><label class="f">E-post<input id="mE" type="email" required value="${esc(state.memE)}"></label>
+  <button class="btn primary" type="submit">Opprett bruker</button></form>
+  <p class="small" role="status" style="margin:8px 0 0">${esc(state.memMsg)}</p>
+  <div class="reg" style="margin-top:8px">${members.map(x=>`<div class="r"><div class="grow">${esc(x.id)}</div><button class="btn" data-memreset="${esc(x.id)}">Nytt passord</button><button class="btn" data-memdel="${esc(x.id)}">Fjern</button></div>`).join('')||'<p class="small">Ingen medlemmer lagt inn ennå.</p>'}</div></div>`}
+
 function loginCard(){
-  if(state.user)return `<div class="card"><div class="row"><div class="grow"><b>Innlogget som medlem</b><div class="small">${esc(state.user.email)}${state.admin?' · administrator':''}</div></div>
+  if(state.user)return `<div class="card"><div class="row"><div class="grow"><b>${state.member?'Innlogget som medlem':'Innlogget, men ikke på medlemslisten'}</b><div class="small">${esc(state.user.email)}${state.admin?' · administrator':''}</div></div>
    <button class="btn" data-logout>Logg ut</button></div>
    <details style="margin-top:12px"${state.pwMsg?' open':''}><summary style="cursor:pointer;font-weight:600">Endre passord</summary>
    <form class="form" id="pw" style="margin-top:10px">${pwField('pO','Nåværende passord','current-password')}
@@ -275,7 +284,7 @@ function loginCard(){
    ${pwField('pR','Gjenta nytt passord','new-password','minlength="8"')}
    <button class="btn primary" type="submit">Lagre nytt passord</button></form>
    <p class="small" role="status" style="margin:8px 0 0">${esc(state.pwMsg)}</p></details></div>`;
-  return `<div class="card"><h2>Logg inn</h2><p class="small" style="margin:4px 0 12px">For medlemmer og ledere. Du får brukernavn og passord av menigheten.</p>
+  return `<div class="card"><h2>Logg inn</h2><p class="small" style="margin:4px 0 12px">For medlemmer og ledere. Du får en e-post fra menigheten der du velger passord.</p>
   ${FB?`<form class="form" id="login"><label class="f">E-post<input id="lE" type="email" autocomplete="username" required></label>
   ${pwField('lP','Passord','current-password')}
   <button class="btn primary" type="submit">Logg inn</button><button class="theme" type="button" data-reset>Glemt passord?</button></form>
@@ -285,7 +294,7 @@ function me(){
   const sw=(k,l,s)=>`<div class="switch"><div><b>${l}</b><div class="small">${s}</div></div><button class="tg" role="switch" aria-checked="${state.prefs[k]}" aria-label="${l}" data-pref="${k}"></button></div>`;
   return `<h1>Meg</h1>${loginCard()}
   <div class="card"><h2>Varsler</h2>${sw('Møter','Møter','Påminnelse før hvert møte')}${sw('Happeninger','Happeninger','Konserter, dugnader og turer')}${sw('Ungdom','Ungdom','Bare for ungdomsgruppa')}${sw('Viktig','Viktige meldinger','Endringer og avlysninger')}</div>
-  ${state.admin?admin():''}`}
+  ${state.admin?admin()+memberCard():''}`}
 
 const VIEWS={home,prog,news,me};
 const SUN='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
@@ -312,6 +321,13 @@ document.addEventListener('click',async e=>{
     if(state.rem[id])push('Påminnelse lagt inn',events.find(x=>x.id==id).title+' – du får varsel i forkant.')}
   else if(c.dataset.f){state.filter=c.dataset.f;keep(()=>{})}
   else if(c.dataset.pref){keep(()=>{state.prefs[c.dataset.pref]=!state.prefs[c.dataset.pref];save()})}
+  else if(c.dataset.memdel){
+    if(!confirm('Fjerne '+c.dataset.memdel+' fra medlemslisten? Kontoen blir stående, men personen mister tilgang til medlemsinnhold.'))return;
+    try{await FB.removeMember(c.dataset.memdel);state.memMsg='Fjernet fra medlemslisten.'}catch(er){state.memMsg=saveMsg(er.code)}
+    await refresh()}
+  else if(c.dataset.memreset){
+    try{await FB.reset(c.dataset.memreset);state.memMsg='E-post for nytt passord er sendt til '+c.dataset.memreset+'.'}catch(er){state.memMsg=authMsg(er.code)}
+    keep(()=>{})}
   else if('eye' in c.dataset){const i=c.parentNode.querySelector('input'),show=i.type==='password';i.type=show?'text':'password';c.innerHTML=show?EYEOFF:EYE;c.setAttribute('aria-pressed',String(show));c.setAttribute('aria-label',show?'Skjul passord':'Vis passord')}
   else if('logout' in c.dataset){state.pwMsg='';await FB.logout()}
   else if('reset' in c.dataset){const m=$('#lE').value.trim();
@@ -340,6 +356,11 @@ document.addEventListener('submit',async e=>{
   const f=e.target;
   if(f.id==='login'){e.preventDefault();
     try{await FB.login($('#lE').value.trim(),$('#lP').value);state.err=''}catch(er){keep(()=>state.err=authMsg(er.code))}}
+  else if(f.id==='mem'){e.preventDefault();
+    const m=$('#mE').value.trim().toLowerCase();
+    try{const r=await FB.addMember(m);state.memE='';state.memMsg=r.created?'Bruker opprettet. '+m+' har fått en e-post for å velge passord.':m+' hadde allerede en konto og er lagt på medlemslisten.'}
+    catch(er){state.memE=m;state.memMsg=er.code==='auth/admin-restricted-operation'?'Registrering er slått av i Firebase (Authentication → Settings → User actions).':er.code==='auth/invalid-email'?'Ugyldig e-postadresse.':saveMsg(er.code)}
+    await refresh()}
   else if(f.id==='pw'){e.preventDefault();
     const o=$('#pO').value,n=$('#pN').value,r=$('#pR').value;
     if(n!==r){keep(()=>state.pwMsg='De to nye passordene er ikke like.');return}
@@ -368,8 +389,10 @@ let first=true;
 async function start(){
   FB=await window.fbReady;
   const go=async u=>{
-    state.user=u||null;state.member=!!u;
+    state.user=u||null;
     state.admin=u?await FB.isAdmin(u.email):false;
+    state.member=!!u&&(state.admin||await FB.isMember(u.email));
+    FB.full=state.member;
     await load();
     if(first){first=false;render()}else keep(()=>{});
   };
