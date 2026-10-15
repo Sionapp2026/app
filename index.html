@@ -177,7 +177,7 @@ function ago(p){
 const cnt=id=>counts[id]>0?`<div class="small">${counts[id]} kommer</div>`:'';
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',pushMsg:'',pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
 state.member=false;state.admin=false;state.user=null;
 const save=()=>{try{localStorage.setItem('sm-proto',JSON.stringify({rsvp:state.rsvp,rem:state.rem,prefs:state.prefs}))}catch(e){}};
@@ -310,6 +310,14 @@ function memberCard(){
    return `<div class="r" style="flex-wrap:wrap"><div class="grow" style="min-width:60%">${esc(x.id)}${self?' (deg)':''}<br><span class="tag ${adm?'':'m'}">${adm?'Administrator':'Medlem'}</span></div>
    <div class="btns"><button class="btn" data-memreset="${esc(x.id)}">Nytt passord</button>${self?'':`<button class="btn" data-memrole="${esc(x.id)}" data-to="${adm?'member':'admin'}">${adm?'Gjør til medlem':'Gjør til admin'}</button><button class="btn" data-memdel="${esc(x.id)}">Fjern</button>`}</div></div>`}).join('')||'<p class="small">Ingen brukere lagt inn ennå.</p>'}</div></div>`}
 
+function pushCard(){
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent),standalone=navigator.standalone||matchMedia('(display-mode: standalone)').matches;
+  const on=!!lsGet('sm-push');
+  const body=ios&&!standalone?'På iPhone må du først legge appen på hjemskjermen (Del → Legg til på Hjem-skjerm), og så slå på varsler derfra.'
+    :!FB||!state.pushOk?'Varsler støttes ikke i denne nettleseren.'
+    :on?'<button class="btn" data-pushoff>Slå av varsler</button>':'<button class="btn primary" data-pushon style="width:auto">Slå på varsler</button>';
+  return `<div class="card"><h2>Varsler</h2><p class="small" style="margin:6px 0 12px">Få beskjed om nyheter og endringer, også når appen er lukket.</p>${body}<p class="small" role="status" style="margin:8px 0 0">${esc(state.pushMsg)}</p></div>`}
+
 function loginCard(){
   if(state.user)return `<div class="card"><div class="row"><div class="grow"><b>${state.admin?'Innlogget som administrator':state.member?'Innlogget som medlem':'Innlogget, men ikke på medlemslisten'}</b><div class="small">${esc(state.user.email)}</div></div>
    <button class="btn" data-logout>Logg ut</button></div>
@@ -328,6 +336,7 @@ function loginCard(){
 function me(){
   const sw=(k,l,s)=>`<div class="switch"><div><b>${l}</b><div class="small">${s}</div></div><button class="tg" role="switch" aria-checked="${state.prefs[k]}" aria-label="${l}" data-pref="${k}"></button></div>`;
   return `<h1>Meg</h1>${loginCard()}
+  ${pushCard()}
   ${state.user?`<div class="card"><h2>Medlem i flere menigheter?</h2><p class="small" style="margin:6px 0 0">Mange medlemmer står registrert i andre menigheter enn Sion, og da mister vi statsstøtten for dem. <a href="https://person.brreg.no/nb/minside/tros-og-livssyn" target="_blank" rel="noopener">Sjekk her om du er medlem andre steder</a>. Takk for hjelpen!</p></div>`:''}
 
   ${state.admin?admin()+memberCard():''}`}
@@ -369,6 +378,10 @@ document.addEventListener('click',async e=>{
   else if(c.dataset.memreset){
     try{await FB.reset(c.dataset.memreset);state.memMsg='E-post for nytt passord er sendt til '+c.dataset.memreset+'.'}catch(er){state.memMsg=authMsg(er.code)}
     keep(()=>{})}
+  else if('pushon' in c.dataset){
+    try{const reg=await Promise.race([navigator.serviceWorker.ready,new Promise((_,no)=>setTimeout(()=>no({code:'push/no-sw'}),6000))]);const t=await FB.enablePush(reg);lsSet('sm-push',t);keep(()=>state.pushMsg='Varsler er slått på for denne enheten.')}
+    catch(er){keep(()=>state.pushMsg=er.code==='push/denied'?'Du har sagt nei til varsler. Slå dem på i innstillingene for nettleseren eller appen.':er.code==='push/unsupported'?'Varsler støttes ikke i denne nettleseren.':er.code==='push/no-sw'?'Appen er ikke klar for varsler ennå. Last siden på nytt og prøv igjen.':er.code==='permission-denied'?'Kunne ikke lagre varselkoden (mangler tilgang).':'Kunne ikke slå på varsler. Prøv igjen.')}}
+  else if('pushoff' in c.dataset){await FB.disablePush(lsGet('sm-push'));lsSet('sm-push','');keep(()=>state.pushMsg='Varsler er slått av.')}
   else if('eye' in c.dataset){const i=c.parentNode.querySelector('input'),show=i.type==='password';i.type=show?'text':'password';c.innerHTML=show?EYEOFF:EYE;c.setAttribute('aria-pressed',String(show));c.setAttribute('aria-label',show?'Skjul passord':'Vis passord')}
   else if('logout' in c.dataset){state.pwMsg='';await FB.logout()}
   else if('reset' in c.dataset){const m=$('#lE').value.trim();
@@ -436,6 +449,7 @@ document.addEventListener('change',e=>{if(e.target.name&&e.target.name.endsWith(
 let first=true;
 async function start(){
   FB=await window.fbReady;
+  if(FB){FB.pushSupported().then(v=>{state.pushOk=v;if(state.tab==='me')keep(()=>{})});FB.onPush(p=>push((p.notification&&p.notification.title)||'Melding',(p.notification&&p.notification.body)||''))}
   const go=async u=>{
     state.user=u||null;
     state.admin=u?await FB.isAdmin(u.email):false;

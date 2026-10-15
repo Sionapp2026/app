@@ -3,6 +3,8 @@
 const V='10.14.1',B='https://www.gstatic.com/firebasejs/'+V+'/';
 try{
   const [{initializeApp},A,S]=await Promise.all([import(B+'firebase-app.js'),import(B+'firebase-auth.js'),import(B+'firebase-firestore.js')]);
+  const M=await import(B+'firebase-messaging.js').catch(()=>null);   // varsler; appen virker uten
+  const VAPID='BN0qXSST7zltP6MnXUbUiQg7HUDkobWNyUKld6kpW2TkKPiXtz9n3xbqquMKb0iakhv2wQt3kpDpofroi144D3M';   // offentlig nøkkel for web-push
   const app=initializeApp({
     apiKey:"AIzaSyAd8OmuuLWJYI2ICbPdn7VN6DQge4lp5mA",
     authDomain:"sion-molde-app.firebaseapp.com",
@@ -42,6 +44,22 @@ try{
       if(s.exists())await S.updateDoc(ref,{n:S.increment(delta)});
       else if(delta>0)await S.setDoc(ref,{n:1});
     },
+    // ---- Push-varsler (Firebase Cloud Messaging). Enhetens varselkode lagres i pushTokens; bare administratorer kan lese dem.
+    async pushSupported(){try{return !!M&&await M.isSupported()&&'Notification' in window&&'serviceWorker' in navigator}catch(e){return false}},
+    async enablePush(reg){
+      if(!(await FB.pushSupported()))throw {code:'push/unsupported'};
+      if(await Notification.requestPermission()!=='granted')throw {code:'push/denied'};
+      const token=await M.getToken(M.getMessaging(app),{vapidKey:VAPID,serviceWorkerRegistration:reg});
+      if(!token)throw {code:'push/no-token'};
+      await S.setDoc(S.doc(db,'pushTokens',token),{token,groups:[],created:S.serverTimestamp()});
+      return token;
+    },
+    async disablePush(token){
+      try{await M.deleteToken(M.getMessaging(app))}catch(e){}
+      if(token)try{await S.deleteDoc(S.doc(db,'pushTokens',token))}catch(e){}
+    },
+    // Varsel som kommer mens appen er åpen (da viser ikke nettleseren noe selv).
+    onPush(cb){FB.pushSupported().then(ok=>{if(ok)M.onMessage(M.getMessaging(app),cb)})},
     async isMember(email){
       try{return (await S.getDoc(S.doc(db,'members',email))).exists()}catch(e){return false}
     },

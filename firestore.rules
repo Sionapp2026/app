@@ -22,6 +22,15 @@ service cloud.firestore {
         && (request.resource.data.n - resource.data.n == 1 || resource.data.n - request.resource.data.n == 1);
       allow delete: if isAdmin();
     }
+    // Varselkoder for push. Alle kan registrere sin egen enhet (koden er dokument-ID), bare administratorer kan lese dem.
+    match /pushTokens/{token} {
+      allow create, update: if request.resource.data.keys().hasOnly(['token', 'groups', 'created'])
+        && request.resource.data.token == token
+        && request.resource.data.groups is list && request.resource.data.groups.size() <= 10
+        && request.resource.data.created == request.time;
+      allow delete: if true;
+      allow read: if isAdmin();
+    }
     // Medlemslisten: e-postadressen er dokument-ID. Brukeren kan sjekke sin egen adresse, administratorer styrer listen.
     match /members/{email} {
       allow get: if signedIn() && request.auth.token.email == email || isAdmin();
