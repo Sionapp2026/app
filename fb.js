@@ -54,9 +54,10 @@ try{
       await S.setDoc(S.doc(db,'pushTokens',token),{token,groups:[],created:S.serverTimestamp()});
       return token;
     },
+    // Feiler høyt: kalleren beholder status og viser feil hvis abonnementet ikke faktisk ble fjernet.
     async disablePush(token){
-      try{await M.deleteToken(M.getMessaging(app))}catch(e){}
-      if(token)try{await S.deleteDoc(S.doc(db,'pushTokens',token))}catch(e){}
+      await M.deleteToken(M.getMessaging(app));
+      if(token)await S.deleteDoc(S.doc(db,'pushTokens',token));
     },
     // Varsel som kommer mens appen er åpen (da viser ikke nettleseren noe selv).
     onPush(cb){FB.pushSupported().then(ok=>{if(ok)M.onMessage(M.getMessaging(app),cb)})},

@@ -22,14 +22,17 @@ service cloud.firestore {
         && (request.resource.data.n - resource.data.n == 1 || resource.data.n - request.resource.data.n == 1);
       allow delete: if isAdmin();
     }
-    // Varselkoder for push. Alle kan registrere sin egen enhet (koden er dokument-ID), bare administratorer kan lese dem.
+    // Varselkoder for push. Besøkende kan registrere en enhet, men aldri tildele seg grupper (groups må være tom). Koden er
+    // dokument-ID og må ha lengde som en ekte FCM-kode. Å slette krever at man kjenner koden (den er hemmelig for enheten).
+    // Bare administratorer kan lese listen eller sette grupper. Dette hindrer ikke at fremmede legger inn søppelkoder.
     match /pushTokens/{token} {
       allow create, update: if request.resource.data.keys().hasOnly(['token', 'groups', 'created'])
         && request.resource.data.token == token
-        && request.resource.data.groups is list && request.resource.data.groups.size() <= 10
+        && token.size() >= 100 && token.size() <= 500
+        && request.resource.data.groups is list && request.resource.data.groups.size() == 0
         && request.resource.data.created == request.time;
       allow delete: if true;
-      allow read: if isAdmin();
+      allow read, write: if isAdmin();
     }
     // Medlemslisten: e-postadressen er dokument-ID. Brukeren kan sjekke sin egen adresse, administratorer styrer listen.
     match /members/{email} {

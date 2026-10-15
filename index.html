@@ -381,7 +381,9 @@ document.addEventListener('click',async e=>{
   else if('pushon' in c.dataset){
     try{const reg=await Promise.race([navigator.serviceWorker.ready,new Promise((_,no)=>setTimeout(()=>no({code:'push/no-sw'}),6000))]);const t=await FB.enablePush(reg);lsSet('sm-push',t);keep(()=>state.pushMsg='Varsler er slått på for denne enheten.')}
     catch(er){keep(()=>state.pushMsg=er.code==='push/denied'?'Du har sagt nei til varsler. Slå dem på i innstillingene for nettleseren eller appen.':er.code==='push/unsupported'?'Varsler støttes ikke i denne nettleseren.':er.code==='push/no-sw'?'Appen er ikke klar for varsler ennå. Last siden på nytt og prøv igjen.':er.code==='permission-denied'?'Kunne ikke lagre varselkoden (mangler tilgang).':'Kunne ikke slå på varsler. Prøv igjen.')}}
-  else if('pushoff' in c.dataset){await FB.disablePush(lsGet('sm-push'));lsSet('sm-push','');keep(()=>state.pushMsg='Varsler er slått av.')}
+  else if('pushoff' in c.dataset){
+    try{await FB.disablePush(lsGet('sm-push'));lsSet('sm-push','');keep(()=>state.pushMsg='Varsler er slått av for denne enheten.')}
+    catch(er){keep(()=>state.pushMsg='Kunne ikke slå av varsler. Sjekk nettforbindelsen og prøv igjen.')}}
   else if('eye' in c.dataset){const i=c.parentNode.querySelector('input'),show=i.type==='password';i.type=show?'text':'password';c.innerHTML=show?EYEOFF:EYE;c.setAttribute('aria-pressed',String(show));c.setAttribute('aria-label',show?'Skjul passord':'Vis passord')}
   else if('logout' in c.dataset){state.pwMsg='';await FB.logout()}
   else if('reset' in c.dataset){const m=$('#lE').value.trim();
