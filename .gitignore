@@ -1,0 +1,4 @@
+# Lokale filer som ikke skal publiseres (repoet er offentlig)
+CLAUDE.md
+design/
+overvaaking.gs
