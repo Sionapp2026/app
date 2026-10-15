@@ -192,7 +192,7 @@ function drawTabs(){$('#tabs').innerHTML=TABS.map(([k,l,i])=>`<button data-t="${
 
 function when(d){const diff=Math.round((new Date(d).setHours(0,0,0,0)-new Date(now).setHours(0,0,0,0))/864e5);
   return diff===0?'I dag':diff===1?'I morgen':cap(DAYS[d.getDay()])}
-function dateBox(ev){const d=ev.w,e=ev.e;const m=cap(MON[d.getMonth()]);const s=e&&e.getTime()!==new Date(d).setHours(23,59,0,0)?`${d.getDate()}.${e.getMonth()===d.getMonth()?'-'+e.getDate()+'. '+m:' '+m+'-'+e.getDate()+'. '+cap(MON[e.getMonth()])}`:`${d.getDate()}. ${m}`;return `<div class="date">${s.replace('.-','.–')}</div>`}
+function dateBox(ev){const d=ev.w,e=ev.e;const m=cap(MON[d.getMonth()]);const s=e&&e.getTime()!==new Date(d).setHours(23,59,0,0)?`${d.getDate()}.${e.getMonth()===d.getMonth()?'-'+e.getDate()+'. '+m:' '+m+'-'+e.getDate()+'. '+cap(MON[e.getMonth()])}`:`${d.getDate()}. ${m}`;const yr=d.getFullYear()!==now.getFullYear()?`<br><span style="font-size:13px;opacity:.8">${d.getFullYear()}</span>`:'';return `<div class="date">${s.replace('.-','.–')}${yr}</div>`}
 function evItem(e){
   if(e.m&&!state.member)return `<div class="item"><div class="locked" style="padding:12px">${dateBox(e)}<div class="grow"><b>${e.t}</b><span class="small">Kun for medlemmer. Logg inn under «Meg».</span></div></div></div>`;
   const open=state.open[e.id],r=state.rsvp[e.id];
@@ -249,7 +249,7 @@ function prog(){
   const cats=['Alle','Møter','Happeninger','Ungdom'];
   const list=events.filter(e=>state.filter==='Alle'||e.cat===state.filter);
   let last='',out='';
-  list.forEach(e=>{const k=when(e.w)+' '+e.w.getDate()+'. '+MON[e.w.getMonth()];
+  list.forEach(e=>{const k=when(e.w)+' '+e.w.getDate()+'. '+MON[e.w.getMonth()]+(e.w.getFullYear()!==now.getFullYear()?' '+e.w.getFullYear():'');
     if(k!==last){out+=`<div class="day">${k}</div>`;last=k}out+=evItem(e)});
   return `<div class="hd"><h1>Kommende arrangementer</h1><span class="script">sett av datoene!</span></div><div class="chips">${cats.map(c=>`<button class="chip" data-f="${c}" aria-pressed="${state.filter===c}">${c}</button>`).join('')}</div>
   <div class="list">${out||'<p class="small">Ingen oppføringer her ennå.</p>'}</div>${regList()}`}
@@ -311,7 +311,7 @@ function memberCard(){
    <div class="btns"><button class="btn" data-memreset="${esc(x.id)}">Nytt passord</button>${self?'':`<button class="btn" data-memrole="${esc(x.id)}" data-to="${adm?'member':'admin'}">${adm?'Gjør til medlem':'Gjør til admin'}</button><button class="btn" data-memdel="${esc(x.id)}">Fjern</button>`}</div></div>`}).join('')||'<p class="small">Ingen brukere lagt inn ennå.</p>'}</div></div>`}
 
 function loginCard(){
-  if(state.user)return `<div class="card"><div class="row"><div class="grow"><b>${state.member?'Innlogget som medlem':'Innlogget, men ikke på medlemslisten'}</b><div class="small">${esc(state.user.email)}${state.admin?' · administrator':''}</div></div>
+  if(state.user)return `<div class="card"><div class="row"><div class="grow"><b>${state.admin?'Innlogget som administrator':state.member?'Innlogget som medlem':'Innlogget, men ikke på medlemslisten'}</b><div class="small">${esc(state.user.email)}</div></div>
    <button class="btn" data-logout>Logg ut</button></div>
    <details style="margin-top:12px"${state.pwMsg?' open':''}><summary style="cursor:pointer;font-weight:600">Endre passord</summary>
    <form class="form" id="pw" method="post" action="#" style="margin-top:10px"><input type="text" name="username" autocomplete="username" value="${esc(state.user.email)}" readonly tabindex="-1" aria-hidden="true" style="display:none">${pwField('pO','Nåværende passord','current-password')}
