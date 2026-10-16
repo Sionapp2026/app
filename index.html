@@ -209,7 +209,7 @@ const SV_URL='https://docs.google.com/forms/d/e/1FAIpQLScYERloVM4jsoPdXmpeqJYecX
 /* «Jeg kommer»: navn og svar sendes til Google Skjema «Jeg kommer – arrangementer» (regneark i Drive).
    Tallet som vises i appen telles separat i databasen. Google svarer ikke tilbake, så vi ser ikke om det lyktes. */
 /* Adressen til Apps Script-tjenesten som sender varsler (varsel-script.gs). Tom = skjemaene for å sende varsel skjules. */
-let PUSH_URL='';
+let PUSH_URL='https://script.google.com/macros/s/AKfycbz-t4PruOcRFJQ_bXwEcpdab9ks6_AMl2wlJZSO7UztI05fUK7UcnPEvV9gsEvwcbV5/exec';
 const RS_URL='https://docs.google.com/forms/d/e/1FAIpQLScVKs0aIg8RU7Ess9mFMnKUOHudetvn5AtQIqiIn-OA94rXcg/formResponse';
 const RS={arr:'entry.568243152',dato:'entry.1403655940',navn:'entry.1951632759',kontakt:'entry.722221792',svar:'entry.903786018'};
 const lsGet=k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}};
