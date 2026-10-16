@@ -177,9 +177,10 @@ function ago(p){
 const cnt=id=>counts[id]>0?`<div class="small">${counts[id]} kommer</div>`:'';
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
 state.member=false;state.admin=false;state.user=null;
+{const dt=new URLSearchParams(location.search).get('tab');if(['home','prog','news','me'].includes(dt)){state.tab=dt;try{history.replaceState(null,'',location.pathname)}catch(e){}}}
 const save=()=>{try{localStorage.setItem('sm-proto',JSON.stringify({rsvp:state.rsvp,rem:state.rem,prefs:state.prefs}))}catch(e){}};
 
 const ICON={
@@ -326,6 +327,7 @@ function pushAdmin(){
   <p class="small" style="margin:0 0 10px">Går til alle som har slått på varsler. Skriv ikke noe sensitivt, for varselet kan vises på låst skjerm.</p>
   <form class="form" id="pushsend"><label class="f">Tittel<input id="psT" maxlength="60" required value="${esc(state.psT)}"></label>
   <label class="f">Tekst<textarea id="psB" rows="2" maxlength="140">${esc(state.psB)}</textarea></label>
+  <label class="f">Når noen trykker på varselet, åpnes<select id="psTab">${[['news','Nyheter'],['home','Hjem'],['prog','Program']].map(([v,l])=>`<option value="${v}" ${state.psTab===v?'selected':''}>${l}</option>`).join('')}</select></label>
   <button class="btn primary" type="submit">Send varsel</button></form>
   <p class="small" role="status" style="margin:8px 0 0">${esc(state.pushSendMsg)}</p></div>`}
 
@@ -429,11 +431,11 @@ document.addEventListener('submit',async e=>{
     try{const em=$('#lE').value.trim(),pw=$('#lP').value;await FB.login(em,pw);state.err='';
       try{if(window.PasswordCredential)await navigator.credentials.store(new PasswordCredential({id:em,password:pw,name:em}))}catch(x){}}catch(er){keep(()=>state.err=authMsg(er.code))}}
   else if(f.id==='pushsend'){e.preventDefault();
-    const t=$('#psT').value.trim(),b=$('#psB').value.trim();
+    const t=$('#psT').value.trim(),b=$('#psB').value.trim(),tab=$('#psTab').value;
     if(!t)return;
     if(!confirm('Sende «'+t+'» til alle som har slått på varsler?'))return;
-    state.psT=t;state.psB=b;keep(()=>state.pushSendMsg='Sender ...');
-    try{const r=await FB.sendPush(PUSH_URL,t,b);
+    state.psT=t;state.psB=b;state.psTab=tab;keep(()=>state.pushSendMsg='Sender ...');
+    try{const r=await FB.sendPush(PUSH_URL,t,b,tab);
       keep(()=>{if(r.ok){state.pushSendMsg='Sendt til '+r.sendt+' av '+r.enheter+' enheter'+(r.feilet?' ('+r.feilet+' feilet)':'')+'.';state.psT='';state.psB=''}else state.pushSendMsg='Ikke sendt: '+r.feil})}
     catch(er){keep(()=>state.pushSendMsg='Kunne ikke nå varseltjenesten. Prøv igjen om litt.')}}
   else if(f.id==='mem'){e.preventDefault();
@@ -470,7 +472,7 @@ document.addEventListener('submit',async e=>{
       state.msg='Lagret.';state.adm.edit=null;usingFb=true;
       if(wantPush&&!isEdit){
         if(d.m)state.msg='Lagret. Varsel er ikke sendt: medlemsnyheter varsles ikke ennå, fordi alle som har varsler på ville fått tittelen.';
-        else try{const r=await FB.sendPush(PUSH_URL,d.t,String(d.b||'').slice(0,140));state.msg='Lagret. '+(r.ok?'Varsel sendt til '+r.sendt+' av '+r.enheter+' enheter.':'Varsel ikke sendt: '+r.feil)}catch(x){state.msg='Lagret. Varsel kunne ikke sendes (ingen kontakt med varseltjenesten).'}
+        else try{const r=await FB.sendPush(PUSH_URL,d.t,String(d.b||'').slice(0,140),'news');state.msg='Lagret. '+(r.ok?'Varsel sendt til '+r.sendt+' av '+r.enheter+' enheter.':'Varsel ikke sendt: '+r.feil)}catch(x){state.msg='Lagret. Varsel kunne ikke sendes (ingen kontakt med varseltjenesten).'}
       }
     }catch(er){state.msg=saveMsg(er.code);keep(()=>{});return}
     await refresh()}
@@ -487,12 +489,13 @@ async function start(){
     state.member=!!u&&(state.admin||await FB.isMember(u.email));
     FB.full=state.member;
     await load();
-    if(first){first=false;render()}else keep(()=>{});
+    if(first){first=false;if(state.tab==='news')markSeen();render()}else keep(()=>{});
   };
   if(FB)FB.onAuth(u=>go(u).catch(()=>{$('#view').textContent='Kunne ikke laste program. Prøv igjen senere.'}));
   else{await load();render()}
 }
 start().catch(()=>{$('#view').textContent='Kunne ikke laste program. Prøv igjen senere.'});
-if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});
+  navigator.serviceWorker.addEventListener('message',e=>{const d=e.data||{};if(d.type==='open-tab'&&['home','prog','news','me'].includes(d.tab)){state.tab=d.tab;if(d.tab==='news')markSeen();render()}})}
 </script>
 </body></html>

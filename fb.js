@@ -71,9 +71,9 @@ try{
       if(token)await S.deleteDoc(S.doc(db,'pushTokens',token));
     },
     // Sender varsel via Apps Script-tjenesten. Tjenesten sjekker innloggingsbeviset og at brukeren er administrator.
-    async sendPush(url,title,body){
+    async sendPush(url,title,body,tab){
       const idToken=await auth.currentUser.getIdToken(true);
-      const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({idToken,title,body})});
+      const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({idToken,title,body,tab})});
       return r.json();
     },
     // Varsel som kommer mens appen er åpen (da viser ikke nettleseren noe selv).
