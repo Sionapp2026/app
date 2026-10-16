@@ -177,7 +177,7 @@ function ago(p){
 const cnt=id=>counts[id]>0?`<div class="small">${counts[id]} kommer</div>`:'';
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',pushMsg:'',pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
 state.member=false;state.admin=false;state.user=null;
 const save=()=>{try{localStorage.setItem('sm-proto',JSON.stringify({rsvp:state.rsvp,rem:state.rem,prefs:state.prefs}))}catch(e){}};
@@ -208,6 +208,8 @@ function evItem(e){
 const SV_URL='https://docs.google.com/forms/d/e/1FAIpQLScYERloVM4jsoPdXmpeqJYecXNBGl6GNNjNl5vequqCrTvSWw/formResponse',SV_ENTRY='entry.1990573754';
 /* «Jeg kommer»: navn og svar sendes til Google Skjema «Jeg kommer – arrangementer» (regneark i Drive).
    Tallet som vises i appen telles separat i databasen. Google svarer ikke tilbake, så vi ser ikke om det lyktes. */
+/* Adressen til Apps Script-tjenesten som sender varsler (varsel-script.gs). Tom = skjemaene for å sende varsel skjules. */
+let PUSH_URL='';
 const RS_URL='https://docs.google.com/forms/d/e/1FAIpQLScVKs0aIg8RU7Ess9mFMnKUOHudetvn5AtQIqiIn-OA94rXcg/formResponse';
 const RS={arr:'entry.568243152',dato:'entry.1403655940',navn:'entry.1951632759',kontakt:'entry.722221792',svar:'entry.903786018'};
 const lsGet=k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}};
@@ -271,11 +273,11 @@ const PLACES=['Kometvegen 7','Åndalsnes','Eidsvåg','Eide','Tingvoll'],TIMES=['
 /* [felt, etikett, type, valg, type på feltet for «Annet»]. Stjerne etter typen betyr obligatorisk. */
 const FIELDS={
  events:[['title','Tittel','text*'],['start','Startdato','date*'],['end','Sluttdato (bare for flere dager)','date'],['time','Klokkeslett','combo',TIMES,'time'],['place','Sted','combo',PLACES,'text'],['who','Taler eller hvem','text'],['text','Beskrivelse','area'],['cat','Kategori','sel',CATS],['m','Bare for medlemmer','chk']],
- posts:[['t','Tittel','text*'],['b','Melding','area*'],['tag','Målgruppe','sel',['Alle','Medlem','Ungdom']]],
+ posts:[['t','Tittel','text*'],['b','Melding','area*'],['tag','Målgruppe','sel',['Alle','Medlem','Ungdom']],['push','Send også som varsel til telefonene','chk']],
  regular:[['title','Tittel','text*'],['day','Ukedag','sel',[1,2,3,4,5,6,0]],['time','Klokkeslett','combo*',TIMES,'time'],['note','Merknad','text'],['cat','Kategori','sel',CATS]]};
 const COL={events:'events',posts:'posts',regular:'regular'};
 const TYPES=[['events','Arrangement'],['posts','Nyhet'],['regular','Fast samling']];
-function fields(t,ed){return FIELDS[t].map(([k,l,ty,o,it])=>{
+function fields(t,ed){return FIELDS[t].filter(f=>f[0]!=='push'||(PUSH_URL&&!ed)).map(([k,l,ty,o,it])=>{
   const req=ty.endsWith('*'),b=ty.replace('*',''),v=ed?ed[k]:undefined;
   if(b==='combo'){const known=!v||o.includes(v),cur=!ed?o[0]:!v?(req?o[0]:''):known?v:'__annet';
     return `<label class="f">${l}<select name="${k}Sel">${o.map(x=>`<option value="${x}" ${cur===x?'selected':''}>${x}</option>`).join('')}${req?'':`<option value="" ${cur===''?'selected':''}>Ikke oppgitt</option>`}<option value="__annet" ${cur==='__annet'?'selected':''}>Annet</option></select><input name="${k}" type="${it}" value="${known?'':esc(v)}" ${known?'hidden':''}></label>`}
@@ -318,6 +320,15 @@ function pushCard(){
     :on?'<button class="btn" data-pushoff>Slå av varsler</button> <button class="btn" data-pushcopy>Kopier varselkode</button>':'<button class="btn primary" data-pushon style="width:auto">Slå på varsler</button>';
   return `<div class="card"><h2>Varsler</h2><p class="small" style="margin:6px 0 12px">Få beskjed om nyheter og endringer, også når appen er lukket.</p>${body}<p class="small" role="status" style="margin:8px 0 0">${esc(state.pushMsg)}</p></div>`}
 
+function pushAdmin(){
+  if(!PUSH_URL)return '';
+  return `<div class="card"><h3 style="margin-bottom:6px">Send varsel</h3>
+  <p class="small" style="margin:0 0 10px">Går til alle som har slått på varsler. Skriv ikke noe sensitivt, for varselet kan vises på låst skjerm.</p>
+  <form class="form" id="pushsend"><label class="f">Tittel<input id="psT" maxlength="60" required value="${esc(state.psT)}"></label>
+  <label class="f">Tekst<textarea id="psB" rows="2" maxlength="140">${esc(state.psB)}</textarea></label>
+  <button class="btn primary" type="submit">Send varsel</button></form>
+  <p class="small" role="status" style="margin:8px 0 0">${esc(state.pushSendMsg)}</p></div>`}
+
 function loginCard(){
   if(state.user)return `<div class="card"><div class="row"><div class="grow"><b>${state.admin?'Innlogget som administrator':state.member?'Innlogget som medlem':'Innlogget, men ikke på medlemslisten'}</b><div class="small">${esc(state.user.email)}</div></div>
    <button class="btn" data-logout>Logg ut</button></div>
@@ -339,7 +350,7 @@ function me(){
   ${pushCard()}
   ${state.user?`<div class="card"><h2>Medlem i flere menigheter?</h2><p class="small" style="margin:6px 0 0">Mange medlemmer står registrert i andre menigheter enn Sion, og da mister vi statsstøtten for dem. <a href="https://person.brreg.no/nb/minside/tros-og-livssyn" target="_blank" rel="noopener">Sjekk her om du er medlem andre steder</a>. Takk for hjelpen!</p></div>`:''}
 
-  ${state.admin?admin()+memberCard():''}`}
+  ${state.admin?admin()+pushAdmin()+memberCard():''}`}
 
 const VIEWS={home,prog,news,me};
 const SUN='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
@@ -417,6 +428,14 @@ document.addEventListener('submit',async e=>{
   if(f.id==='login'){e.preventDefault();
     try{const em=$('#lE').value.trim(),pw=$('#lP').value;await FB.login(em,pw);state.err='';
       try{if(window.PasswordCredential)await navigator.credentials.store(new PasswordCredential({id:em,password:pw,name:em}))}catch(x){}}catch(er){keep(()=>state.err=authMsg(er.code))}}
+  else if(f.id==='pushsend'){e.preventDefault();
+    const t=$('#psT').value.trim(),b=$('#psB').value.trim();
+    if(!t)return;
+    if(!confirm('Sende «'+t+'» til alle som har slått på varsler?'))return;
+    state.psT=t;state.psB=b;keep(()=>state.pushSendMsg='Sender ...');
+    try{const r=await FB.sendPush(PUSH_URL,t,b);
+      keep(()=>{if(r.ok){state.pushSendMsg='Sendt til '+r.sendt+' av '+r.enheter+' enheter'+(r.feilet?' ('+r.feilet+' feilet)':'')+'.';state.psT='';state.psB=''}else state.pushSendMsg='Ikke sendt: '+r.feil})}
+    catch(er){keep(()=>state.pushSendMsg='Kunne ikke nå varseltjenesten. Prøv igjen om litt.')}}
   else if(f.id==='mem'){e.preventDefault();
     const m=$('#mE').value.trim().toLowerCase(),role=$('#mR').value;
     try{const r=await FB.addUser(m,role);state.memE='';state.memR='member';state.memMsg=r.created?'Bruker opprettet som '+(role==='admin'?'administrator':'medlem')+'. '+m+' har fått en e-post for å velge passord.':m+' hadde allerede en konto og er lagt inn som '+(role==='admin'?'administrator':'medlem')+'.'}
@@ -441,12 +460,18 @@ document.addEventListener('submit',async e=>{
   else if(f.id==='adm'){e.preventDefault();
     const t=f.dataset.type,fd=new FormData(f),d={};
     FIELDS[t].forEach(([k,,ty])=>{const b=ty.replace('*','');d[k]=b==='combo'?(fd.get(k+'Sel')==='__annet'?String(fd.get(k)||'').trim():fd.get(k+'Sel')):b==='chk'?fd.has(k):k==='day'?+fd.get(k):String(fd.get(k)||'').trim()});
+    const wantPush=t==='posts'&&!!d.push;if(t==='posts')delete d.push;
     if(t==='posts')d.m=d.tag==='Medlem';
     if(t==='regular'){d.m=false;if(!d.time){keep(()=>state.msg='Velg eller skriv inn klokkeslett.');return}}
     if(t==='events')d.m=!!d.m;
+    const isEdit=!!state.adm.edit;
     try{
       if(state.adm.edit)await FB.set(COL[t],state.adm.edit,d);else await FB.add(COL[t],d);
       state.msg='Lagret.';state.adm.edit=null;usingFb=true;
+      if(wantPush&&!isEdit){
+        if(d.m)state.msg='Lagret. Varsel er ikke sendt: medlemsnyheter varsles ikke ennå, fordi alle som har varsler på ville fått tittelen.';
+        else try{const r=await FB.sendPush(PUSH_URL,d.t,String(d.b||'').slice(0,140));state.msg='Lagret. '+(r.ok?'Varsel sendt til '+r.sendt+' av '+r.enheter+' enheter.':'Varsel ikke sendt: '+r.feil)}catch(x){state.msg='Lagret. Varsel kunne ikke sendes (ingen kontakt med varseltjenesten).'}
+      }
     }catch(er){state.msg=saveMsg(er.code);keep(()=>{});return}
     await refresh()}
 });

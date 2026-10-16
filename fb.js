@@ -70,6 +70,12 @@ try{
       if(!done)throw err||{code:'push/not-removed'};
       if(token)await S.deleteDoc(S.doc(db,'pushTokens',token));
     },
+    // Sender varsel via Apps Script-tjenesten. Tjenesten sjekker innloggingsbeviset og at brukeren er administrator.
+    async sendPush(url,title,body){
+      const idToken=await auth.currentUser.getIdToken(true);
+      const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({idToken,title,body})});
+      return r.json();
+    },
     // Varsel som kommer mens appen er åpen (da viser ikke nettleseren noe selv).
     onPush(cb){FB.pushSupported().then(ok=>{if(ok)M.onMessage(M.getMessaging(app),cb)})},
     async isMember(email){
