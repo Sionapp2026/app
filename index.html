@@ -386,8 +386,8 @@ document.addEventListener('click',async e=>{
     try{await navigator.clipboard.writeText(t);keep(()=>state.pushMsg='Varselkoden er kopiert ('+t.length+' tegn). Lim den inn i testen. Del den ikke med andre.')}
     catch(er){keep(()=>state.pushMsg='Kunne ikke kopiere automatisk.');prompt('Kopier varselkoden:',t)}}
   else if('pushoff' in c.dataset){
-    try{await FB.disablePush(lsGet('sm-push'));lsSet('sm-push','');keep(()=>state.pushMsg='Varsler er slått av for denne enheten.')}
-    catch(er){keep(()=>state.pushMsg='Kunne ikke slå av varsler. Sjekk nettforbindelsen og prøv igjen.')}}
+    try{const reg=await navigator.serviceWorker.getRegistration();await FB.disablePush(lsGet('sm-push'),reg);lsSet('sm-push','');keep(()=>state.pushMsg='Varsler er slått av for denne enheten.')}
+    catch(er){keep(()=>state.pushMsg='Kunne ikke slå av varsler ('+((er&&(er.code||er.name))||'ukjent feil')+'). Prøv igjen, og send meg koden i parentesen hvis det fortsetter.')}}
   else if('eye' in c.dataset){const i=c.parentNode.querySelector('input'),show=i.type==='password';i.type=show?'text':'password';c.innerHTML=show?EYEOFF:EYE;c.setAttribute('aria-pressed',String(show));c.setAttribute('aria-label',show?'Skjul passord':'Vis passord')}
   else if('logout' in c.dataset){state.pwMsg='';await FB.logout()}
   else if('reset' in c.dataset){const m=$('#lE').value.trim();

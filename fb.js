@@ -55,8 +55,19 @@ try{
       return token;
     },
     // Feiler høyt: kalleren beholder status og viser feil hvis abonnementet ikke faktisk ble fjernet.
-    async disablePush(token){
-      await M.deleteToken(M.getMessaging(app));
+    // Firebase trenger å vite hvilken service worker som eier abonnementet (reg) før koden kan slettes etter en sideinnlasting.
+    // Mislykkes den vanlige slettingen, avslutter vi abonnementet direkte i nettleseren. Mislykkes begge, feiler vi høyt.
+    async disablePush(token,reg){
+      const m=M.getMessaging(app);
+      let done=false,err;
+      try{
+        if(reg)await M.getToken(m,{vapidKey:VAPID,serviceWorkerRegistration:reg}).catch(()=>{});
+        done=await M.deleteToken(m);
+      }catch(e){err=e}
+      if(!done&&reg){
+        try{const sub=await reg.pushManager.getSubscription();if(sub)await sub.unsubscribe();done=true}catch(e){err=err||e}
+      }
+      if(!done)throw err||{code:'push/not-removed'};
       if(token)await S.deleteDoc(S.doc(db,'pushTokens',token));
     },
     // Varsel som kommer mens appen er åpen (da viser ikke nettleseren noe selv).
