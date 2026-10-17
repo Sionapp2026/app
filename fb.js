@@ -16,6 +16,10 @@ try{
   await A.setPersistence(auth,A.browserLocalPersistence).catch(()=>{});   // brukeren forblir innlogget til hen logger ut
   // Egen forekomst brukes til å opprette brukere, slik at administratoren ikke logges ut av seg selv.
   const secAuth=A.getAuth(initializeApp(app.options,'oppretter'));
+  // Sikkerhetspunkter (snapshots): innholdet lagres som tekst i databasen så administratorer kan rulle tilbake etter et uhell.
+  const SNAP_COLS=['events','posts','regular','members','admins'],KEEP_COLS=['events','posts','regular'];
+  const utTid=v=>v&&typeof v.toDate==='function'?{__tid:v.toDate().toISOString()}:Array.isArray(v)?v.map(utTid):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,utTid(x)])):v;
+  const revive=v=>v&&typeof v==='object'&&typeof v.__tid==='string'?S.Timestamp.fromDate(new Date(v.__tid)):Array.isArray(v)?v.map(revive):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,revive(x)])):v;
   const FB={
     full:false,   // true for medlemmer og administratorer: da hentes også medlemsinnhold
     get user(){return auth.currentUser},
@@ -96,6 +100,66 @@ try{
         res[c]=snap.docs.map(d=>({id:d.id,data:ut(d.data())}));
       }
       return res;
+    },
+    // ---- Sikkerhetspunkter og tilbakerulling (bare administratorer) ----
+    // Oversikten ligger i snapshots, selve innholdet som tekst i snapshotData. Innhold (arrangementer, nyheter, faste samlinger) erstattes ved
+    // tilbakerulling. Brukerlistene (members, admins) flettes: ingen brukere slettes, og ingen administrator kan låses ute.
+    async collect(cols){
+      const res={};
+      for(const c of cols){const snap=await S.getDocs(S.collection(db,c));res[c]=snap.docs.map(d=>({id:d.id,data:utTid(d.data())}))}
+      return res;
+    },
+    async makeSnapshot(label){
+      const data=await FB.collect(SNAP_COLS),json=JSON.stringify(data);
+      if(json.length>900000)throw {code:'snapshot/too-large'};
+      const counts=Object.fromEntries(Object.entries(data).map(([k,v])=>[k,v.length]));
+      // Et automatisk punkt av et tomt innhold lages ikke: da kunne en katastrofe slette gode punkter over tid.
+      if(label==='Automatisk'&&(counts.events||0)+(counts.posts||0)+(counts.regular||0)===0)return null;
+      const ref=await S.addDoc(S.collection(db,'snapshots'),{created:S.serverTimestamp(),by:auth.currentUser.email,label,counts});
+      await S.setDoc(S.doc(db,'snapshotData',ref.id),{json});
+      FB.pruneSnapshots(30).catch(()=>{});
+      return ref.id;
+    },
+    async listSnapshots(){
+      const snap=await S.getDocs(S.query(S.collection(db,'snapshots'),S.orderBy('created','desc'),S.limit(60)));
+      return snap.docs.map(d=>{const x=d.data();return {id:d.id,label:x.label,by:x.by,counts:x.counts||{},ms:x.created&&x.created.toMillis?x.created.toMillis():0}});
+    },
+    async pruneSnapshots(keep){
+      const l=await FB.listSnapshots();
+      for(const x of l.slice(keep)){await S.deleteDoc(S.doc(db,'snapshotData',x.id)).catch(()=>{});await S.deleteDoc(S.doc(db,'snapshots',x.id))}
+    },
+    // Lager et punkt bare hvis det siste er eldre enn minMs (så vi ikke lager ett for hver sletting).
+    async ensureSnapshot(label,minMs){
+      const l=await FB.listSnapshots();
+      return l.length&&Date.now()-l[0].ms<minMs?l[0].id:FB.makeSnapshot(label);
+    },
+    async loadSnapshot(id){
+      const s=await S.getDoc(S.doc(db,'snapshotData',id));
+      if(!s.exists())throw {code:'snapshot/missing'};
+      return JSON.parse(s.data().json);
+    },
+    // Ren planlegging (uten skriving): hva som skal skrives og slettes for å gjenskape data. current = id-er som finnes nå, per samling.
+    planRestore(current,data){
+      const sets=[],dels=[];
+      for(const c of SNAP_COLS){
+        const snap=data&&data[c];if(!Array.isArray(snap))continue;
+        const ids=new Set(snap.map(x=>x.id));
+        snap.forEach(x=>sets.push([c,x.id,x.data]));
+        if(KEEP_COLS.includes(c))(current[c]||[]).filter(id=>!ids.has(id)).forEach(id=>dels.push([c,id]));
+      }
+      return {sets,dels};
+    },
+    async restore(data){
+      const current={};
+      for(const c of KEEP_COLS){const snap=await S.getDocs(S.collection(db,c));current[c]=snap.docs.map(d=>d.id)}
+      const {sets,dels}=FB.planRestore(current,data);
+      const ops=[...dels.map(([c,id])=>({del:[c,id]})),...sets.map(([c,id,d])=>({set:[c,id,d]}))];
+      for(let i=0;i<ops.length;i+=400){
+        const b=S.writeBatch(db);
+        ops.slice(i,i+400).forEach(o=>{if(o.del)b.delete(S.doc(db,o.del[0],o.del[1]));else b.set(S.doc(db,o.set[0],o.set[1]),revive(o.set[2]))});
+        await b.commit();
+      }
+      return {skrevet:sets.length,slettet:dels.length};
     },
     // Varsel som kommer mens appen er åpen (da viser ikke nettleseren noe selv).
     onPush(cb){FB.pushSupported().then(ok=>{if(ok)M.onMessage(M.getMessaging(app),cb)})},

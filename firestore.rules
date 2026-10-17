@@ -28,6 +28,9 @@ service cloud.firestore {
       allow update: if col in ['events', 'posts'] && isLeader() && ledGroups(resource.data.get('groups', [])) && ledGroups(request.resource.data.get('groups', [])) && request.resource.data.get('m', false) == true;
       allow delete: if col in ['events', 'posts'] && isLeader() && ledGroups(resource.data.get('groups', []));
     }
+    // Sikkerhetspunkter for tilbakerulling (bare administratorer): oversikt i snapshots, innholdet som tekst i snapshotData.
+    match /snapshots/{id} { allow read, write: if isAdmin(); }
+    match /snapshotData/{id} { allow read, write: if isAdmin(); }
     // «Jeg kommer»-teller per arrangement. Alle kan lese og endre tallet med ett om gangen, bare administratorer kan slette.
     match /rsvpCounts/{id} {
       allow read: if true;
