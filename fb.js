@@ -76,6 +76,18 @@ try{
       const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({idToken,title,body,tab})});
       return r.json();
     },
+    // Sikkerhetskopi: henter alt innhold (også medlemsinnhold og brukerlister) som ren tekst. Bare administratorer får lov.
+    // Varselkoder (pushTokens) tas ikke med: de er enhetsidentifikatorer og lar seg gjenskape ved at folk slår på varsler igjen.
+    async exportAll(){
+      const cols=['events','posts','regular','rsvpCounts','members','admins'];
+      const ut=v=>v&&typeof v.toDate==='function'?{__tid:v.toDate().toISOString()}:Array.isArray(v)?v.map(ut):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,ut(x)])):v;
+      const res={};
+      for(const c of cols){
+        const snap=await S.getDocs(S.collection(db,c));
+        res[c]=snap.docs.map(d=>({id:d.id,data:ut(d.data())}));
+      }
+      return res;
+    },
     // Varsel som kommer mens appen er åpen (da viser ikke nettleseren noe selv).
     onPush(cb){FB.pushSupported().then(ok=>{if(ok)M.onMessage(M.getMessaging(app),cb)})},
     async isMember(email){
