@@ -300,14 +300,14 @@ function home(){
   <div class="card"><h2>Finn frem</h2><p class="small" style="margin:6px 0 0">Adresse: Kometvegen 7, 6419 Molde<br>Kontortid: tirsdag–torsdag kl. 10–16<br>Telefon: <a href="tel:+4771251029">71 25 10 29</a><br>E-post: <a href="mailto:post@sionmolde.no">post@sionmolde.no</a></p></div>`}
 
 function prog(){
-  const cats=['Alle',...CATS.filter(canSeeCat)];
+  const cats=['Alle',...allCats().filter(canSeeCat)];
   const list=[...events.filter(e=>state.filter==='Alle'||normCat(e.cat)===state.filter).map(e=>({ev:e,w:e.w})),...nextFast().filter(f=>state.filter==='Alle'||normCat(f.fast.cat)===state.filter)].sort((a,b)=>a.w-b.w);
   let last='',out='';
   list.forEach(x=>{const e=x.ev||{w:x.w};const k=when(e.w)+' '+e.w.getDate()+'. '+MON[e.w.getMonth()]+(e.w.getFullYear()!==now.getFullYear()?' '+e.w.getFullYear():'');
     if(k!==last){out+=`<div class="day">${k}</div>`;last=k}out+=x.ev?evItem(x.ev):fastItem(x.fast,x.w,x.ex)});
   const kanLp=state.admin&&editOn();
   const kanNy=editOn();
-  return `<div class="hd"><h1>Kommende arrangementer</h1><span class="script">sett av datoene!</span></div>${kanNy?'<button class="btn primary" data-wiz style="width:auto">+ Nytt arrangement</button>':''}<div class="chips">${cats.map(c=>`<button class="chip" data-f="${c}" aria-pressed="${state.filter===c}">${c}</button>`).join('')}</div>
+  return `<div class="hd"><h1>Kommende arrangementer</h1><span class="script">sett av datoene!</span></div>${kanNy?'<button class="btn primary" data-wiz style="width:auto">+ Nytt arrangement</button>':''}<div class="chips">${cats.map(c=>`<button class="chip" data-f="${esc(c)}" aria-pressed="${state.filter===c}">${esc(c)}</button>`).join('')}</div>
   ${kanLp?'<p class="small" style="margin:0 0 8px">Hold inne på et arrangement eller en fast samling for å endre eller slette.</p>':''}
   <div class="list">${out||'<p class="small">Ingen oppføringer her ennå.</p>'}</div>`}
 
@@ -325,6 +325,8 @@ function news(){
 
 /* ---------- Innlogging og administrasjon ---------- */
 const CATS=['Møte','Samling','Ledersamling','Menighetsmøte','Happeninger','Ungdom'];
+/* Kategorier: de seks faste + alle nye som er brukt på et arrangement eller en fast samling (lages av administrator i veiviseren, steg 1). */
+const allCats=()=>[...CATS,...new Set([...rawEvents,...regular].map(x=>normCat(x.cat)).filter(c=>c&&!CATS.includes(c)))];
 const normCat=c=>c==='Møter'?'Møte':c;
 /* «Ledersamling» er bare for ledere: administratorer, gruppeledere og medlemmer i gruppen Lederrådet. Andre ser verken kategorien eller arrangementene. */
 /* Visning: «meg» (mine egne rettigheter), «medlem» (vanlig innlogget medlem uten grupper) eller «besok» (ikke innlogget). Påvirker bare hva som vises som innhold. */
@@ -377,7 +379,7 @@ function fields(t,ed,only){return FIELDS[t].filter(f=>(!only||only.includes(f[0]
     const tips=!state.admin?'Velg minst én av gruppene du leder. Bare medlemmer i gruppene og administratorer ser innholdet.':isAud?'Velger du ingenting, blir nyheten åpen for alle. «Bare medlemmer» krever innlogging. Velger du grupper, er det bare medlemmer i de gruppene (og administratorer) som ser nyheten.':'Velger du ingen grupper, gjelder arrangementet alle.';
     return `<fieldset class="f" style="border:0;padding:0;margin:0"><legend style="font-weight:600;font-size:14px;margin-bottom:4px">${l}</legend>${(state.admin?o:myGroupOptions()).map(x=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="${k}" value="${x}" style="width:22px;height:22px;flex:none" ${cur.includes(x)?'checked':''}>${esc(nm(x))}</label>`).join('')}<span class="small">${tips}</span></fieldset>`}
   if(b==='area')return `<label class="f">${l}<textarea name="${k}" rows="3" ${req?'required':''}>${esc(v)}</textarea></label>`;
-  if(b==='sel')return `<label class="f">${l}<select name="${k}">${o.map(x=>`<option value="${x}" ${String(v==null?o[0]:(k==='cat'?normCat(v):v))===String(x)?'selected':''}>${k==='day'?cap(DAYS[x]):x}</option>`).join('')}</select></label>`;
+  if(b==='sel')return `<label class="f">${l}<select name="${k}">${(k==='cat'?allCats():o).map(x=>`<option value="${x}" ${String(v==null?o[0]:(k==='cat'?normCat(v):v))===String(x)?'selected':''}>${k==='day'?cap(DAYS[x]):x}</option>`).join('')}</select></label>`;
   if(b==='chk')return `<label class="f" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="${k}" style="width:auto" ${v?'checked':''}>${l}</label>`;
   return `<label class="f">${l}<input name="${k}" type="${b}" ${req?'required':''} value="${esc(v)}"></label>`}).join('')}
 function admItems(t){const l=t==='events'?rawEvents.slice().sort((a,b)=>a.start<b.start?-1:1):t==='posts'?posts:regular;const f=t==='posts'||state.af==='Alle'?l:l.filter(x=>normCat(x.cat)===state.af);return state.admin?f:f.filter(ledItem)}
@@ -392,7 +394,7 @@ function admin(){
    <div class="btns"><button class="btn primary" type="submit" style="width:auto">${ed?'Lagre endring':t==='posts'?'Send melding':!state.admin?'Send':'Legg til'}</button><button class="btn" type="button" data-acancel>Avbryt</button></div></form>`:`<button class="btn primary" data-anew style="width:auto;margin-top:12px">+ Legg til ${({events:'nytt arrangement',posts:'ny nyhet',regular:'ny fast samling'})[t]}</button>`}
   <p class="small" role="status" style="margin:8px 0 0">${esc(state.msg)}</p>
   <h3 style="margin:14px 0 6px;font-size:19px">Eksisterende ${({events:'arrangementer',posts:'nyheter',regular:'faste samlinger'})[t]} (${items.length})</h3>
-  ${t==='posts'?'':`<div class="chips" style="margin:4px 0 8px">${['Alle',...CATS.filter(canSeeCat)].map(c=>`<button class="chip" data-af="${c}" aria-pressed="${state.af===c}">${c}</button>`).join('')}</div>`}
+  ${t==='posts'?'':`<div class="chips" style="margin:4px 0 8px">${['Alle',...allCats().filter(canSeeCat)].map(c=>`<button class="chip" data-af="${esc(c)}" aria-pressed="${state.af===c}">${esc(c)}</button>`).join('')}</div>`}
   ${items.length?`<div class="btns" style="align-items:center;margin:4px 0 8px"><label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" data-aselall style="width:22px;height:22px" ${nSel===items.length?'checked':''}>Velg alle</label>
   <button class="btn" data-adelsel ${nSel?'':'disabled'}>Slett valgte (${nSel})</button></div>`:''}
   <div class="reg">${items.map(x=>`<div class="r"><input type="checkbox" data-asel="${esc(x.id)}" aria-label="Velg" style="width:22px;height:22px;flex:none;align-self:center" ${state.sel[x.id]?'checked':''}><div class="grow">${admLabel(t,x)}</div><button class="btn" data-aedit="${esc(x.id)}">Rediger</button><button class="btn" data-adel="${esc(x.id)}">Slett</button></div>`).join('')||'<p class="small">Ingenting ennå.</p>'}</div>
@@ -796,6 +798,9 @@ function wizStart(dlg,t){
    +steps.map((st,i)=>'<div class="wizs" data-i="'+i+'" style="display:none;gap:12px"><div><h3 style="margin:0">'+esc(st.h)+'</h3>'+(st.p?'<p class="small" style="margin:4px 0 0">'+esc(st.p)+'</p>':'')+'</div>'+(st.sum?'<div id="wizSum" class="card" style="background:var(--bg);display:grid;gap:4px;font-size:15px"></div>':'')+fields(t,null,st.keys)+'</div>').join('')
    +'<div class="btns" style="margin-top:6px"><button class="btn" type="button" id="wizBack">Tilbake</button><button class="btn primary" type="button" id="wizNext" style="width:auto">Neste</button><button class="btn primary" type="submit" id="wizGo" style="width:auto" disabled>Opprett</button><button class="btn" type="button" data-pubclose>Avbryt</button></div></form><p class="small" role="status" id="pubMsg" style="margin:8px 0 0"></p>';
   const f=dlg.querySelector('#adm'),stepEl=i=>f.querySelector('.wizs[data-i="'+i+'"]');
+  if(state.admin){const cs=f.querySelector('select[name=cat]');if(cs){const op=document.createElement('option');op.value='__ny';op.textContent='+ Ny kategori…';cs.appendChild(op);
+    const bx=document.createElement('label');bx.className='f';bx.style.display='none';bx.innerHTML='Navn på ny kategori<input id="newCat" maxlength="30">';cs.closest('label').after(bx);
+    cs.addEventListener('change',()=>{bx.style.display=cs.value==='__ny'?'':'none';if(cs.value==='__ny')bx.querySelector('input').focus()})}}
   const kat=k=>{const e=f.elements[k];return e?(e.value||''):''};
   const summary=()=>{
     const fd=new FormData(f),g=k=>String(fd.get(k)||'').trim(),L=[];
@@ -812,6 +817,11 @@ function wizStart(dlg,t){
     if(steps[i].sum)summary();state.msg='';$('#pubMsg').textContent=''};
   const feil=m=>{state.msg=m;$('#pubMsg').textContent=m};
   const ok=()=>{
+    const cs=f.querySelector('select[name=cat]');
+    if(cur===0&&cs&&cs.value==='__ny'){const nm=f.querySelector('#newCat').value.trim().replace(/s+/g,' ');if(!nm){feil('Skriv navn på den nye kategorien.');return false}
+      const fin=allCats().find(c=>c.toLowerCase()===nm.toLowerCase());
+      if(fin)cs.value=fin;else{const op=document.createElement('option');op.value=op.textContent=nm;cs.insertBefore(op,cs.querySelector('[value=__ny]'));cs.value=nm}
+      f.querySelector('#newCat').closest('label').style.display='none'}
     const els=[...stepEl(cur).querySelectorAll('input,select,textarea')];
     for(const el of els){if(el.hidden||!el.willValidate)continue;if(!el.checkValidity()){el.reportValidity();return false}}
     if(t==='events'&&cur===1&&!state.admin&&!f.querySelector('[name=groups]:checked')){feil('Velg minst én av gruppene du leder.');return false}
