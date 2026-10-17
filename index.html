@@ -309,7 +309,7 @@ const effLeder=()=>state.view==='meg'&&state.leder===true;
 const canSeeCat=c=>normCat(c)!=='Ledersamling'||effAdmin()||effLeder()||effLeads().length>0||effGroups().includes('lederradet');
 const canPreview=()=>state.admin||state.leder===true||(state.leads||[]).length>0;   // eldre arrangementer og faste samlinger bruker «Møter»
 /* Grupper i menigheten: [id, navn, forklaring]. Samme id-er står i varsel-script.gs. Brukere plasseres i grupper under Brukere. */
-const GROUPS=[['sondagsskole','Søndagsskole','barnearbeid'],['activ8','Activ8','ungdom'],['hangout','Hangout','unge voksne'],['debora','Debora','kvinnearbeid'],['cdur','Sion C-dur','mannsfellesskap'],['kjokken','Kjøkken',''],['torsdagsgruppa','Torsdagsgruppa',''],['vertskap','Vertskap',''],['lederradet','Lederrådet',''],['ungdomsledere','Ungdomsledere',''],['sommerstevne','Sommerstevne','']];
+const GROUPS=[['sondagsskole','Søndagsskole','barnearbeid'],['activ8','Activ8','ungdom'],['hangout','Hangout','unge voksne'],['debora','Debora','kvinnearbeid'],['cdur','Sion C-dur','mannsfellesskap'],['kjokken','Kjøkken',''],['torsdagsgruppa','Torsdagsgruppa',''],['vertskap','Vertskap',''],['lederradet','Lederrådet',''],['ungdomsledere','Ungdomsledere',''],['sommerstevne','Sommerstevne',''],['elevate','Elevate',''],['lovsang','Lovsangsteamet','']];
 const GR_IDS=GROUPS.map(g=>g[0]);
 const gName=id=>{const g=GROUPS.find(x=>x[0]===id);return g?g[1]:id};
 const gLabel=id=>{const g=GROUPS.find(x=>x[0]===id);return g?g[1]+(g[2]?' ('+g[2]+')':''):id};
