@@ -189,7 +189,7 @@ function ago(p){
 const cnt=id=>counts[id]>0?`<div class="small">${counts[id]} kommer</div>`:'';
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',memEA:'',memEL:'',memEM:'',memGL:[],memGM:[],snaps:null,snapMsg:'',view:'meg',acc:{},sel:{},groups:[],leads:[],ulOpen:'',psMal:'alle',psGr:[],ugOpen:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',leder:false,memELd:'',memEA:'',memEL:'',memEM:'',memGL:[],memGM:[],snaps:null,snapMsg:'',view:'meg',acc:{},sel:{},groups:[],leads:[],ulOpen:'',psMal:'alle',psGr:[],ugOpen:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
 state.member=false;state.admin=false;state.user=null;
 {const dt=new URLSearchParams(location.search).get('tab');if(['home','prog','news','me'].includes(dt)){state.tab=dt;try{history.replaceState(null,'',location.pathname)}catch(e){}}}
@@ -289,7 +289,9 @@ const effAdmin=()=>state.admin&&state.view==='meg';
 const effLeads=()=>state.view==='meg'?(state.leads||[]):[];
 const effGroups=()=>state.view==='meg'?(state.groups||[]):[];
 const visOK=x=>state.view!=='besok'||!x.m;
-const canSeeCat=c=>normCat(c)!=='Ledersamling'||effAdmin()||effLeads().length>0||effGroups().includes('lederradet');   // eldre arrangementer og faste samlinger bruker «Møter»
+const effLeder=()=>state.view==='meg'&&state.leder===true;
+const canSeeCat=c=>normCat(c)!=='Ledersamling'||effAdmin()||effLeder()||effLeads().length>0||effGroups().includes('lederradet');
+const canPreview=()=>state.admin||state.leder===true||(state.leads||[]).length>0;   // eldre arrangementer og faste samlinger bruker «Møter»
 /* Grupper i menigheten: [id, navn, forklaring]. Samme id-er står i varsel-script.gs. Brukere plasseres i grupper under Brukere. */
 const GROUPS=[['sondagsskole','Søndagsskole','barnearbeid'],['activ8','Activ8','ungdom'],['hangout','Hangout','unge voksne'],['debora','Debora','kvinnearbeid'],['cdur','Sion C-dur','mannsfellesskap'],['kjokken','Kjøkken',''],['torsdagsgruppa','Torsdagsgruppa',''],['vertskap','Vertskap',''],['lederradet','Lederrådet',''],['ungdomsledere','Ungdomsledere',''],['sommerstevne','Sommerstevne','']];
 const GR_IDS=GROUPS.map(g=>g[0]);
@@ -346,14 +348,14 @@ const EYEOFF='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke
 const pwField=(id,label,ac,extra)=>`<label class="f">${label}<span class="pw"><input id="${id}" type="password" autocomplete="${ac}" ${extra||''} required><button type="button" class="eye" data-eye aria-label="Vis passord" aria-pressed="false">${EYE}</button></span></label>`;
 const userRow=(x,me)=>{
   const self=x.id===me,adm=x.role==='admin',leader=(x.leads||[]).length>0;
-  return `<div class="r" style="flex-wrap:wrap"><div class="grow" style="min-width:60%">${esc(x.id)}${self?' (deg)':''}<br><span class="tag ${adm?'':'m'}">${adm?'Administrator':leader?'Gruppeleder':'Medlem'}</span></div>
+  return `<div class="r" style="flex-wrap:wrap"><div class="grow" style="min-width:60%">${esc(x.id)}${self?' (deg)':''}<br><span class="tag ${adm?'':'m'}">${adm?'Administrator':x.leder?'Leder':leader?'Gruppeleder':'Medlem'}</span>${x.leder&&leader?' <span class="tag">Gruppeleder</span>':''}</div>
    <details ${state.ugOpen===x.id?'open':''} style="flex-basis:100%"><summary class="small" style="cursor:pointer">Grupper (${(x.groups||[]).length})${(x.groups||[]).length?': '+esc((x.groups||[]).map(gName).join(', ')):''}</summary><div style="display:grid;gap:6px;margin:6px 0">${GROUPS.map(g=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-ug="${esc(x.id)}" data-gid="${g[0]}" style="width:22px;height:22px;flex:none" ${(x.groups||[]).includes(g[0])?'checked':''}>${esc(gLabel(g[0]))}</label>`).join('')}</div></details>
    ${adm?'':`<details ${state.ulOpen===x.id?'open':''} style="flex-basis:100%"><summary class="small" style="cursor:pointer">Leder for (${(x.leads||[]).length})${(x.leads||[]).length?': '+esc((x.leads||[]).map(gName).join(', ')):''}</summary><div class="small" style="margin:4px 0">Kan publisere nyheter, arrangementer og varsler, men bare til gruppene som er avkrysset. Personen legges også inn i gruppen.</div><div style="display:grid;gap:6px;margin:6px 0">${GROUPS.map(g=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-ul="${esc(x.id)}" data-gid="${g[0]}" style="width:22px;height:22px;flex:none" ${(x.leads||[]).includes(g[0])?'checked':''}>${esc(gLabel(g[0]))}</label>`).join('')}</div></details>`}
-   <div class="btns"><button class="btn" data-memreset="${esc(x.id)}">Nytt passord</button>${self?'':`<button class="btn" data-memrole="${esc(x.id)}" data-to="${adm?'member':'admin'}">${adm?'Gjør til medlem':'Gjør til admin'}</button><button class="btn" data-memdel="${esc(x.id)}">Fjern</button>`}</div></div>`};
+   <div class="btns"><button class="btn" data-memreset="${esc(x.id)}">Nytt passord</button>${adm||self?'':`<button class="btn" data-ledertoggle="${esc(x.id)}" data-on="${x.leder?'0':'1'}">${x.leder?'Fjern lederrolle':'Gjør til leder'}</button>`}${self?'':`<button class="btn" data-memrole="${esc(x.id)}" data-to="${adm?'member':'admin'}">${adm?'Gjør til medlem':'Gjør til admin'}</button><button class="btn" data-memdel="${esc(x.id)}">Fjern</button>`}</div></div>`};
 
 function memberCard(){
   const me=state.user?state.user.email:'';
-  const adms=members.filter(x=>x.role==='admin'),leds=members.filter(x=>x.role!=='admin'&&(x.leads||[]).length),meds=members.filter(x=>x.role!=='admin'&&!(x.leads||[]).length);
+  const adms=members.filter(x=>x.role==='admin'),lds=members.filter(x=>x.role!=='admin'&&x.leder),leds=members.filter(x=>x.role!=='admin'&&!x.leder&&(x.leads||[]).length),meds=members.filter(x=>x.role!=='admin'&&!x.leder&&!(x.leads||[]).length);
   const sec=(key,tittel,n,body)=>`<details class="acc sub" data-acc="${key}" ${state.acc[key]?'open':''}><summary><h3 style="font-size:19px">${tittel} (${n})</h3></summary>${body}</details>`;
   const grBoks=(sel,hjelp)=>`<fieldset class="f" style="border:0;padding:0;margin:0"><legend style="font-weight:600;font-size:14px;margin-bottom:4px">${hjelp}</legend><div style="display:grid;gap:6px">${GROUPS.map(g=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-newg="${g[0]}" style="width:22px;height:22px;flex:none" ${sel.includes(g[0])?'checked':''}>${esc(gLabel(g[0]))}</label>`).join('')}</div></fieldset>`;
   const skjema=(id,tekst,ekstra,knapp)=>`<form class="form" id="${id}" style="margin:0 0 10px;padding:10px;background:var(--bg);border-radius:10px"><p class="small" style="margin:0">${tekst}</p><label class="f">E-post<input id="mE${id.slice(3)}" type="email" required value="${esc(state['memE'+id.slice(3)]||'')}"></label>${ekstra}<button class="btn primary" type="submit">${knapp}</button></form>`;
@@ -362,6 +364,7 @@ function memberCard(){
   <p class="small" style="margin:0 0 4px">Åpne riktig rolle for å legge til en ny bruker. Personen får en e-post og velger passord selv.</p>
   <p class="small" role="status" style="margin:0 0 6px">${esc(state.memMsg)}</p>
   ${sec('b_adm','Administratorer',adms.length,skjema('memA','<b>Ny administrator.</b> Kan endre alt innhold og alle brukere, og sende varsler til alle. Gi bare denne rollen til dem som trenger den.','','Legg til administrator')+liste(adms))}
+  ${sec('b_ld','Ledere',lds.length,skjema('memLd','<b>Ny leder.</b> Ser ledersamlinger og innhold for ledere. Kan ikke publisere. Vil du la personen publisere for bestemte grupper, bruker du «Gruppeledere» under.','','Legg til leder')+liste(lds))}
   ${sec('b_led','Gruppeledere',leds.length,skjema('memL','<b>Ny gruppeleder.</b> Et medlem som kan publisere nyheter, arrangementer og varsler, men bare for gruppene hen leder.',grBoks(state.memGL,'Leder for (velg minst én)'),'Legg til gruppeleder')+liste(leds))}
   ${sec('b_med','Medlemmer',meds.length,skjema('memM','<b>Nytt medlem.</b> Ser medlemsinnhold og innhold for gruppene hen er med i.',grBoks(state.memGM,'Med i grupper (valgfritt)'),'Legg til medlem')+liste(meds))}
   </details>`}
@@ -419,7 +422,7 @@ function snapCard(){
   <button class="btn" data-filerestore>Gjenopprett fra fil</button></details>`}
 
 function loginCard(){
-  if(state.user)return `<div class="card"><div class="row"><div class="grow"><b>${state.admin?'Innlogget som administrator':isLeader()?'Innlogget som gruppeleder':state.member?'Innlogget som medlem':'Innlogget, men ikke på medlemslisten'}</b><div class="small">${esc(state.user.email)}</div></div>
+  if(state.user)return `<div class="card"><div class="row"><div class="grow"><b>${state.admin?'Innlogget som administrator':state.leder||isLeader()?'Innlogget som '+[state.leder?'leder':'',isLeader()?'gruppeleder':''].filter(Boolean).join(' og '):state.member?'Innlogget som medlem':'Innlogget, men ikke på medlemslisten'}</b><div class="small">${esc(state.user.email)}</div></div>
    <button class="btn" data-logout>Logg ut</button></div>
    <details style="margin-top:12px"${state.pwMsg?' open':''}><summary style="cursor:pointer;font-weight:600">Endre passord</summary>
    <form class="form" id="pw" method="post" action="#" style="margin-top:10px"><input type="text" name="username" autocomplete="username" value="${esc(state.user.email)}" readonly tabindex="-1" aria-hidden="true" style="display:none">${pwField('pO','Nåværende passord','current-password')}
@@ -449,7 +452,7 @@ function themeIcon(){const d=isDark(),b=$('#themeBtn');b.innerHTML=d?SUN:MOON;b.
 themeIcon();matchMedia('(prefers-color-scheme:dark)').addEventListener('change',themeIcon);
 function badge(){
   $('#badge').textContent=state.unread;$('#badge').hidden=!state.unread;
-  const vb=$('#viewBtn');if(vb){if(!vb.innerHTML)vb.innerHTML=EYE;vb.hidden=!(state.admin||isLeader());vb.classList.toggle('on',state.view!=='meg');vb.setAttribute('aria-label',state.view==='meg'?'Vis appen som en annen':'Du ser appen som '+(state.view==='medlem'?'vanlig medlem':'besøkende')+'. Trykk for å endre.')}
+  const vb=$('#viewBtn');if(vb){if(!vb.innerHTML)vb.innerHTML=EYE;vb.hidden=!canPreview();vb.classList.toggle('on',state.view!=='meg');vb.setAttribute('aria-label',state.view==='meg'?'Vis appen som en annen':'Du ser appen som '+(state.view==='medlem'?'vanlig medlem':'besøkende')+'. Trykk for å endre.')}
 }
 const viewBanner=()=>'';
 function render(){drawTabs();$('#view').innerHTML=viewBanner()+VIEWS[state.tab]();badge();window.scrollTo(0,0)}
@@ -470,6 +473,12 @@ document.addEventListener('click',async e=>{
   else if('rscancel' in c.dataset){$('#rsDlg').close();rsPending=null}
   else if(c.dataset.f){state.filter=c.dataset.f;keep(()=>{})}
   else if(c.dataset.pref){keep(()=>{state.prefs[c.dataset.pref]=!state.prefs[c.dataset.pref];save()})}
+  else if(c.dataset.ledertoggle){
+    const on=c.dataset.on==='1',id=c.dataset.ledertoggle;
+    if(!confirm((on?'Gjøre ':'Fjerne lederrollen fra ')+id+(on?' til leder?':'?')))return;
+    try{await FB.setLeder(id,on);const u=members.find(m=>m.id===id);if(u)u.leder=on;state.memMsg=on?id+' er nå leder.':'Lederrollen er fjernet fra '+id+'.';state.acc.b_ld=true}
+    catch(er){state.memMsg=saveMsg(er.code)}
+    keep(()=>{})}
   else if(c.dataset.memdel){
     if(!confirm('Fjerne '+c.dataset.memdel+' fra brukerlisten? Kontoen blir stående, men personen mister tilgang til medlemsinnhold og administrasjon.'))return;
     try{await FB.removeUser(c.dataset.memdel);state.memMsg='Fjernet fra brukerlisten.'}catch(er){state.memMsg=saveMsg(er.code)}
@@ -570,7 +579,7 @@ document.addEventListener('click',async e=>{
     }catch(er){state.msg=saveMsg(er.code)}
     await refresh()}
   else if(c.id==='viewBtn'||c.closest&&c.closest('#viewBtn')){
-    const o=[['meg',state.admin?'Meg selv (administrator)':'Meg selv (gruppeleder)','Du ser alt du har tilgang til.'],['medlem','Vanlig innlogget medlem','Bare det som er for innloggede medlemmer, ikke ledersamlinger eller innhold for bestemte grupper.'],['besok','Besøkende (ikke innlogget)','Bare det som er åpent for alle.']];
+    const o=[['meg',state.admin?'Meg selv (administrator)':state.leder?'Meg selv (leder)':'Meg selv (gruppeleder)','Du ser alt du har tilgang til.'],['medlem','Vanlig innlogget medlem','Bare det som er for innloggede medlemmer, ikke ledersamlinger eller innhold for bestemte grupper.'],['besok','Besøkende (ikke innlogget)','Bare det som er åpent for alle.']];
     $('#viewOpts').innerHTML=o.map(([v,l,t])=>`<label style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;font-weight:400"><input type="radio" name="viewmode" value="${v}" ${state.view===v?'checked':''} style="width:22px;height:22px;flex:none;margin-top:2px"><span><b>${esc(l)}</b><br><span class="small">${esc(t)}</span></span></label>`).join('');
     $('#viewDlg').showModal()}
   else if('viewclose' in c.dataset){$('#viewDlg').close()}
@@ -602,19 +611,20 @@ document.addEventListener('submit',async e=>{
     catch(er){melding=(asNews?'Nyheten er lagt ut, men v':'V')+'arselet kunne ikke sendes (ingen kontakt med varseltjenesten). Prøv igjen om litt.'}
     if(asNews)await load().catch(()=>{});
     keep(()=>state.pushSendMsg=melding)}
-  else if(f.id==='memA'||f.id==='memL'||f.id==='memM'){e.preventDefault();
+  else if(f.id==='memA'||f.id==='memLd'||f.id==='memL'||f.id==='memM'){e.preventDefault();
     const suff=f.id.slice(3),m=$('#mE'+suff).value.trim().toLowerCase(),role=f.id==='memA'?'admin':'member';
     const gr=[...f.querySelectorAll('[data-newg]')].filter(x=>x.checked).map(x=>x.dataset.newg);
     if(f.id==='memL'&&!gr.length){keep(()=>{state['memE'+suff]=m;state.memMsg='Velg minst én gruppe personen skal lede.'});return}
     if(role==='admin'&&!confirm('Gi '+m+' full tilgang som administrator?\n\nAdministratorer kan endre alt innhold, alle brukere og sende varsler til alle.'))return;
     try{
       const r=await FB.addUser(m,role);
-      if(f.id==='memL')await FB.setLeads(m,gr,gr);
+      if(f.id==='memLd')await FB.setLeder(m,true);
+      else if(f.id==='memL')await FB.setLeads(m,gr,gr);
       else if(f.id==='memM'&&gr.length)await FB.setGroups(m,'member',gr);
       state['memE'+suff]='';state.memGL=[];state.memGM=[];
-      const hva=role==='admin'?'administrator':f.id==='memL'?'gruppeleder for '+gr.map(gName).join(', '):'medlem';
+      const hva=role==='admin'?'administrator':f.id==='memLd'?'leder':f.id==='memL'?'gruppeleder for '+gr.map(gName).join(', '):'medlem';
       state.memMsg=(r.created?'Bruker opprettet som ':m+' hadde allerede en konto og er lagt inn som ')+hva+'.'+(r.created?' '+m+' har fått en e-post for å velge passord.':'');
-      state.acc[f.id==='memA'?'b_adm':f.id==='memL'?'b_led':'b_med']=true;
+      state.acc[f.id==='memA'?'b_adm':f.id==='memLd'?'b_ld':f.id==='memL'?'b_led':'b_med']=true;
     }catch(er){state['memE'+suff]=m;state.memMsg=er.code==='auth/admin-restricted-operation'?'Registrering er slått av i Firebase (Authentication → Settings → User actions).':er.code==='auth/invalid-email'?'Ugyldig e-postadresse.':saveMsg(er.code)}
     await refresh()}
   else if(f.id==='pw'){e.preventDefault();
@@ -703,6 +713,7 @@ async function start(){
     if(state.admin)FB.ensureSnapshot('Automatisk',20*3600e3).then(()=>{state.snaps=null}).catch(()=>{});
     state.groups=u&&state.member?await FB.myGroups(u.email):[];
     state.leads=u&&state.member&&!state.admin?await FB.myLeads(u.email):[];
+    state.leder=u&&state.member&&!state.admin?await FB.myLeder(u.email):false;
     if(u&&lsGet('sm-push'))FB.linkPush(lsGet('sm-push')).catch(()=>{});
     await load();
     if(first){first=false;if(state.tab==='news')markSeen();render()}else keep(()=>{});
