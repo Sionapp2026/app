@@ -206,6 +206,7 @@ function drawTabs(){$('#tabs').innerHTML=TABS.map(([k,l,i])=>`<button data-t="${
 function when(d){const diff=Math.round((new Date(d).setHours(0,0,0,0)-new Date(now).setHours(0,0,0,0))/864e5);
   return diff===0?'I dag':diff===1?'I morgen':cap(DAYS[d.getDay()])}
 function dateBox(ev){const d=ev.w,e=ev.e;const m=cap(MON[d.getMonth()]);const s=e&&e.getTime()!==new Date(d).setHours(23,59,0,0)?`${d.getDate()}.${e.getMonth()===d.getMonth()?'-'+e.getDate()+'. '+m:' '+m+'-'+e.getDate()+'. '+cap(MON[e.getMonth()])}`:`${d.getDate()}. ${m}`;const yr=d.getFullYear()!==now.getFullYear()?`<br><span style="font-size:13px;opacity:.8">${d.getFullYear()}</span>`:'';return `<div class="date">${s.replace('.-','.–')}${yr}</div>`}
+function nextFast(){return regular.filter(r=>/^[0-9]{1,2}:[0-9]{2}$/.test(r.time||'')).map(r=>{const [h,mi]=r.time.split(':').map(Number),w=new Date(now);w.setHours(h,mi,0,0);w.setDate(w.getDate()+(r.day-w.getDay()+7)%7);if(w<now)w.setDate(w.getDate()+7);return {fast:r,w}})}
 function fastItem(r,w){return `<div class="item"><div class="locked" style="padding:12px;color:var(--ink)"><div class="date">${w.getDate()}. ${cap(MON[w.getMonth()])}</div><div class="grow"><b>${esc(r.title)}</b><span class="small">${when(w)} kl. ${esc(r.time)}${r.note?' · '+esc(r.note):''}</span></div><span class="tag">Fast</span></div></div>`}
 function evItem(e){
   if(e.m&&!state.member)return `<div class="item"><div class="locked" style="padding:12px">${dateBox(e)}<div class="grow"><b>${e.t}</b><span class="small">Kun for medlemmer. Logg inn under «Meg».</span></div></div></div>`;
@@ -250,7 +251,7 @@ function svCard(){
 
 function home(){
   const vis=events.filter(e=>(!e.m||state.member)&&!e.hideHome), n=vis[0];
-  const fast=regular.filter(r=>/^[0-9]{1,2}:[0-9]{2}$/.test(r.time||'')).map(r=>{const [h,mi]=r.time.split(':').map(Number),w=new Date(now);w.setHours(h,mi,0,0);w.setDate(w.getDate()+(r.day-w.getDay()+7)%7);if(w<now)w.setDate(w.getDate()+7);return {fast:r,w}});
+  const fast=nextFast();
   const wk=[...vis.slice(1,4).map(e=>({ev:e,w:e.w})),...fast.map(f=>({fast:f.fast,w:f.w}))].sort((a,b)=>a.w-b.w).slice(0,6);
   const post=posts.filter(p=>(!p.m||state.member)&&!p.hideHome)[0];
   return `<div><h1>Velkommen</h1><span class="script">dette skjer i Sion Molde</span></div>
@@ -265,12 +266,12 @@ function home(){
 
 function prog(){
   const cats=['Alle',...CATS.filter(canSeeCat)];
-  const list=events.filter(e=>state.filter==='Alle'||normCat(e.cat)===state.filter);
+  const list=[...events.filter(e=>state.filter==='Alle'||normCat(e.cat)===state.filter).map(e=>({ev:e,w:e.w})),...nextFast().filter(f=>state.filter==='Alle'||normCat(f.fast.cat)===state.filter)].sort((a,b)=>a.w-b.w);
   let last='',out='';
-  list.forEach(e=>{const k=when(e.w)+' '+e.w.getDate()+'. '+MON[e.w.getMonth()]+(e.w.getFullYear()!==now.getFullYear()?' '+e.w.getFullYear():'');
-    if(k!==last){out+=`<div class="day">${k}</div>`;last=k}out+=evItem(e)});
+  list.forEach(x=>{const e=x.ev||{w:x.w};const k=when(e.w)+' '+e.w.getDate()+'. '+MON[e.w.getMonth()]+(e.w.getFullYear()!==now.getFullYear()?' '+e.w.getFullYear():'');
+    if(k!==last){out+=`<div class="day">${k}</div>`;last=k}out+=x.ev?evItem(x.ev):fastItem(x.fast,x.w)});
   return `<div class="hd"><h1>Kommende arrangementer</h1><span class="script">sett av datoene!</span></div><div class="chips">${cats.map(c=>`<button class="chip" data-f="${c}" aria-pressed="${state.filter===c}">${c}</button>`).join('')}</div>
-  <div class="list">${out||'<p class="small">Ingen oppføringer her ennå.</p>'}</div>${regList()}`}
+  <div class="list">${out||'<p class="small">Ingen oppføringer her ennå.</p>'}</div>`}
 
 function regList(){
   const l=regular.filter(r=>state.filter==='Alle'||normCat(r.cat)===state.filter);
