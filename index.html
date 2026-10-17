@@ -328,13 +328,13 @@ function admLabel(t,x){return t==='events'?`${esc(x.start)} · ${esc(x.title)}${
 function admin(){
   const t=state.adm.type,items=admItems(t),ed=state.adm.edit?items.find(x=>x.id==state.adm.edit):null;
   const nSel=items.filter(x=>state.sel[x.id]).length;
-  return `<details class="card acc" data-acc="adm" ${state.acc.adm?'open':''}><summary><h2>${state.admin?'Administrator':'Publiser for gruppene dine'}</h2></summary>
+  return `<details class="card acc" data-acc="adm" ${state.acc.adm?'open':''}><summary><h2>${state.admin?'Legg inn og rediger':'Publiser for gruppene dine'}</h2></summary>
   ${usingFb||!state.admin?'':`<p class="small" style="margin:8px 0">Databasen er tom, og appen viser innholdet fra JSON-filene. Flytt det over først, ellers forsvinner det når du legger til noe nytt.</p><button class="btn" data-aimport>Flytt eksisterende innhold til databasen</button>`}
   <div class="chips" style="margin:12px 0">${TYPES.filter(([k])=>state.admin||k!=='regular').map(([k,l])=>`<button class="chip" data-at="${k}" aria-pressed="${t===k}">${l}</button>`).join('')}</div>
   <form class="form" id="adm" data-type="${t}">${fields(t,ed)}
    <div class="btns"><button class="btn primary" type="submit" style="width:auto">${ed?'Lagre endring':'Legg til'}</button>${ed?'<button class="btn" type="button" data-acancel>Avbryt</button>':''}</div></form>
   <p class="small" role="status" style="margin:8px 0 0">${esc(state.msg)}</p></details>
-  <details class="card acc" data-acc="eks" ${state.acc.eks?'open':''}><summary><h3>Eksisterende (${items.length})</h3></summary>
+  <details class="card acc" data-acc="eks" ${state.acc.eks?'open':''}><summary><h3>Eksisterende ${({events:'arrangementer',posts:'nyheter',regular:'faste samlinger'})[t]} (${items.length})</h3></summary>
   ${items.length?`<div class="btns" style="align-items:center;margin:4px 0 8px"><label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" data-aselall style="width:22px;height:22px" ${nSel===items.length?'checked':''}>Velg alle</label>
   <button class="btn" data-adelsel ${nSel?'':'disabled'}>Slett valgte (${nSel})</button></div>`:''}
   <div class="reg">${items.map(x=>`<div class="r"><input type="checkbox" data-asel="${esc(x.id)}" aria-label="Velg" style="width:22px;height:22px;flex:none;align-self:center" ${state.sel[x.id]?'checked':''}><div class="grow">${admLabel(t,x)}</div><button class="btn" data-aedit="${esc(x.id)}">Rediger</button><button class="btn" data-adel="${esc(x.id)}">Slett</button></div>`).join('')||'<p class="small">Ingenting ennå.</p>'}</div></details>`}
