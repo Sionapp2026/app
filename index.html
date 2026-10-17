@@ -177,7 +177,7 @@ function ago(p){
 const cnt=id=>counts[id]>0?`<div class="small">${counts[id]} kommer</div>`:'';
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',sel:{},backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
 state.member=false;state.admin=false;state.user=null;
 {const dt=new URLSearchParams(location.search).get('tab');if(['home','prog','news','me'].includes(dt)){state.tab=dt;try{history.replaceState(null,'',location.pathname)}catch(e){}}}
@@ -290,13 +290,17 @@ function admItems(t){return t==='events'?rawEvents.slice().sort((a,b)=>a.start<b
 function admLabel(t,x){return t==='events'?`${esc(x.start)} · ${esc(x.title)}`:t==='posts'?esc(x.t):`${cap(DAYS[x.day])} ${esc(x.time)} · ${esc(x.title)}`}
 function admin(){
   const t=state.adm.type,items=admItems(t),ed=state.adm.edit?items.find(x=>x.id==state.adm.edit):null;
+  const nSel=items.filter(x=>state.sel[x.id]).length;
   return `<div class="card"><h2>Administrator</h2>
   ${usingFb?'':`<p class="small" style="margin:8px 0">Databasen er tom, og appen viser innholdet fra JSON-filene. Flytt det over først, ellers forsvinner det når du legger til noe nytt.</p><button class="btn" data-aimport>Flytt eksisterende innhold til databasen</button>`}
   <div class="chips" style="margin:12px 0">${TYPES.map(([k,l])=>`<button class="chip" data-at="${k}" aria-pressed="${t===k}">${l}</button>`).join('')}</div>
   <form class="form" id="adm" data-type="${t}">${fields(t,ed)}
    <div class="btns"><button class="btn primary" type="submit" style="width:auto">${ed?'Lagre endring':'Legg til'}</button>${ed?'<button class="btn" type="button" data-acancel>Avbryt</button>':''}</div></form>
   <p class="small" role="status" style="margin:8px 0 0">${esc(state.msg)}</p></div>
-  <div class="card"><h3 style="margin-bottom:6px">Eksisterende</h3><div class="reg">${items.map(x=>`<div class="r"><div class="grow">${admLabel(t,x)}</div><button class="btn" data-aedit="${x.id}">Rediger</button><button class="btn" data-adel="${x.id}">Slett</button></div>`).join('')||'<p class="small">Ingenting ennå.</p>'}</div></div>`}
+  <div class="card"><h3 style="margin-bottom:6px">Eksisterende</h3>
+  ${items.length?`<div class="btns" style="align-items:center;margin:4px 0 8px"><label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" data-aselall style="width:22px;height:22px" ${nSel===items.length?'checked':''}>Velg alle</label>
+  <button class="btn" data-adelsel ${nSel?'':'disabled'}>Slett valgte (${nSel})</button></div>`:''}
+  <div class="reg">${items.map(x=>`<div class="r"><input type="checkbox" data-asel="${esc(x.id)}" aria-label="Velg" style="width:22px;height:22px;flex:none;align-self:center" ${state.sel[x.id]?'checked':''}><div class="grow">${admLabel(t,x)}</div><button class="btn" data-aedit="${esc(x.id)}">Rediger</button><button class="btn" data-adel="${esc(x.id)}">Slett</button></div>`).join('')||'<p class="small">Ingenting ennå.</p>'}</div></div>`}
 
 const EYE='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYEOFF='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.7C3.7 8.5 2 12 2 12s3.6 7 10 7c1.6 0 3-.4 4.3-1M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
@@ -426,9 +430,20 @@ document.addEventListener('click',async e=>{
   else if('reset' in c.dataset){const m=$('#lE').value.trim();
     if(!m){keep(()=>state.err='Skriv inn e-postadressen din først.');return}
     try{await FB.reset(m);keep(()=>state.err='Hvis adressen er registrert, er en lenke for nytt passord sendt.')}catch(er){keep(()=>state.err=authMsg(er.code))}}
-  else if(c.dataset.at){keep(()=>{state.adm={type:c.dataset.at,edit:null};state.msg=''})}
+  else if(c.dataset.at){keep(()=>{state.adm={type:c.dataset.at,edit:null};state.msg='';state.sel={}})}
   else if(c.dataset.aedit){keep(()=>{state.adm.edit=c.dataset.aedit;state.msg=''})}
   else if('acancel' in c.dataset){keep(()=>{state.adm.edit=null;state.msg=''})}
+  else if('adelsel' in c.dataset){
+    const t=state.adm.type,ids=admItems(t).filter(x=>state.sel[x.id]).map(x=>String(x.id));
+    if(!ids.length)return;
+    const navn={events:'arrangementer',posts:'nyheter',regular:'faste samlinger'}[t];
+    if(!confirm('Slette '+ids.length+' valgte '+navn+'? Dette kan ikke angres.'))return;
+    c.disabled=true;let ok=0,feil=0;
+    for(const id of ids){
+      try{await FB.del(COL[t],id);if(t==='events')await FB.del('rsvpCounts',id).catch(()=>{});ok++}catch(er){feil++}
+    }
+    state.sel={};state.adm.edit=null;state.msg='Slettet '+ok+(feil?', '+feil+' feilet (sjekk at du er administrator)':'')+'.';
+    await refresh()}
   else if(c.dataset.adel){
     if(!confirm('Slette denne oppføringen?'))return;
     try{await FB.del(COL[state.adm.type],c.dataset.adel);if(state.adm.type==='events')await FB.del('rsvpCounts',c.dataset.adel).catch(()=>{});state.msg='Slettet.';state.adm.edit=null}catch(er){state.msg=saveMsg(er.code)}
@@ -508,7 +523,10 @@ document.addEventListener('submit',async e=>{
     await refresh()}
 });
 
-document.addEventListener('change',e=>{if(e.target.name&&e.target.name.endsWith('Sel')){const i=e.target.parentNode.querySelector('input');i.hidden=e.target.value!=='__annet';if(!i.hidden)i.focus()}});
+document.addEventListener('change',e=>{
+  const d=e.target.dataset||{};
+  if('asel' in d){keep(()=>{state.sel[d.asel]=e.target.checked});return}
+  if('aselall' in d){const l=admItems(state.adm.type);keep(()=>{state.sel={};if(e.target.checked)l.forEach(x=>state.sel[x.id]=true)});return}if(e.target.name&&e.target.name.endsWith('Sel')){const i=e.target.parentNode.querySelector('input');i.hidden=e.target.value!=='__annet';if(!i.hidden)i.focus()}});
 let first=true;
 async function start(){
   FB=await window.fbReady;
