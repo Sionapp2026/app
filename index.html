@@ -433,7 +433,7 @@ function pushCard(){
   const on=!!lsGet('sm-push');
   const body=ios&&!standalone?'På iPhone må du først legge appen på hjemskjermen (Del → Legg til på Hjem-skjerm), og så slå på varsler derfra.'
     :!FB||!state.pushOk?'Varsler støttes ikke i denne nettleseren.'
-    :on?'<button class="btn" data-pushoff>Slå av varsler</button> <button class="btn" data-pushcopy>Kopier varselkode</button>':'<button class="btn primary" data-pushon style="width:auto">Slå på varsler</button>';
+    :on?'<button class="btn" data-pushoff>Slå av varsler</button>':'<button class="btn primary" data-pushon style="width:auto">Slå på varsler</button>';
   return `<details class="card acc" data-acc="varsler" ${state.acc.varsler?'open':''}><summary><h2>Varsler</h2></summary><p class="small" style="margin:0 0 12px">Få beskjed om nyheter og endringer, også når appen er lukket.</p>${body}<p class="small" role="status" style="margin:8px 0 0">${esc(state.pushMsg)}</p></details>`}
 
 function pushAdmin(){
