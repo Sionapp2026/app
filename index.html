@@ -323,8 +323,8 @@ function prog(){
   const kanNy=editOn();
   return `<div class="hd"><h1>Kommende arrangementer</h1><span class="script">sett av datoene!</span></div>${kanNy?'<button class="btn primary" data-wiz style="width:auto">+ Nytt arrangement</button>':''}
   <input type="search" id="progQ" placeholder="Søk i program …" aria-label="Søk i program" autocomplete="off" value="${esc(state.q||'')}">
-  <div class="chips">${cats.map(c=>`<button class="chip" data-f="${esc(c)}" aria-pressed="${state.filter===c}">${esc(c)}</button>`).join('')}</div>
-  ${kanLp?'<p class="small" style="margin:0 0 8px">Hold inne på et arrangement eller en fast samling for å endre eller slette.</p>':''}
+  <div class="chips">${cats.map(c=>`<button class="chip" data-f="${esc(c)}"${kanLp&&c!=='Alle'&&!CATS.includes(c)?` data-lp="cat:${encodeURIComponent(c)}"`:''} aria-pressed="${state.filter===c}">${esc(c)}</button>`).join('')}</div>
+  ${kanLp?'<p class="small" style="margin:0 0 8px">Hold inne på et arrangement eller en fast samling for å endre eller slette. Hold inne på en egen kategori for å slette den.</p>':''}
   <div class="list" id="progList">${progList()}</div>`}
 
 function regList(){
@@ -891,6 +891,25 @@ function pubAsk(){
   dlg.addEventListener('close',()=>{clearInterval(iv);dlg.remove();state.msg=''});
   dlg.showModal();
 }
+/* Slett en egen kategori: arrangementer og faste samlinger som bruker den flyttes til en annen kategori. De seks faste kategoriene kan ikke slettes. */
+function catAsk(navn){
+  if(!FB||CATS.includes(navn))return;
+  const ev=rawEvents.filter(e=>normCat(e.cat)===navn),rg=regular.filter(r=>normCat(r.cat)===navn);
+  const mål=CATS.filter(c=>c!=='Ledersamling'),dlg=document.createElement('dialog');dlg.className='lp';
+  dlg.innerHTML='<form class="form" method="dialog"><h3 style="margin:0">Slette kategorien «'+esc(navn)+'»?</h3><p class="small" style="margin:0">'+(ev.length||rg.length?'Den brukes av '+ev.length+' arrangement'+(ev.length===1?'':'er')+' og '+rg.length+' fast'+(rg.length===1?'':'e')+' samling'+(rg.length===1?'':'er')+'. De flyttes til kategorien du velger under, og ingenting annet slettes.':'Ingen bruker den.')+'</p>'
+   +(ev.length||rg.length?'<label class="f">Flytt dem til<select id="catTo">'+mål.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join('')+'</select></label>':'')
+   +'<div class="btns col"><button class="btn danger" value="slett">Slett kategorien</button><button class="btn" value="avbryt">Avbryt</button></div></form>';
+  document.body.appendChild(dlg);
+  dlg.addEventListener('close',async()=>{const ok=dlg.returnValue==='slett',til=(dlg.querySelector('#catTo')||{}).value||'Møte';dlg.remove();if(!ok)return;
+    try{
+      if(ev.length||rg.length){try{await FB.ensureSnapshot('Før sletting av kategori',5*60e3)}catch(er){if(!confirm('Kunne ikke lage et sikkerhetspunkt ('+((er&&er.code)||'feil')+'). Fortsette likevel?'))return}}
+      for(const e of ev)await FB.set('events',e.id,{cat:til});
+      for(const r of rg)await FB.set('regular',r.id,{cat:til});
+      if(state.filter===navn)state.filter='Alle';
+      await refresh();push('Kategorien er slettet',(ev.length+rg.length)?(ev.length+rg.length)+' oppføring'+((ev.length+rg.length)===1?'':'er')+' flyttet til «'+til+'».':'«'+navn+'» er fjernet.')}
+    catch(er){push('Kunne ikke slette',saveMsg(er&&er.code))}});
+  dlg.showModal();
+}
 function fastAsk(id,dato){
   const r=regular.find(x=>x.id===id);if(!r||!FB)return;
   const ex=(r.ex||{})[dato]||null,d=new Date(dato+'T'+r.time),dn=cap(DAYS[d.getDay()])+' '+d.getDate()+'. '+MON[d.getMonth()],dlg=document.createElement('dialog');dlg.className='lp';
@@ -929,7 +948,7 @@ function fastAsk(id,dato){
   dlg.showModal();
 }
 function lpAsk(key){
-  const [col,id,dato]=key.split(':');if(col==='fast')return fastAsk(id,dato);
+  const [col,id,dato]=key.split(':');if(col==='fast')return fastAsk(id,dato);if(col==='cat')return catAsk(decodeURIComponent(id));
   const x=(col==='posts'?posts:rawEvents).find(a=>String(a.id)===id);if(!x||!FB)return;
   const tittel=col==='posts'?x.t:x.title,dlg=document.createElement('dialog');dlg.className='lp';
   const mal=col==='posts'?((x.groups||[]).length?{type:'grupper',groups:x.groups}:x.m?{type:'medlem'}:{type:'alle'}):null;
