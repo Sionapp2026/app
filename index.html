@@ -189,7 +189,7 @@ function ago(p){
 const cnt=id=>counts[id]>0?`<div class="small">${counts[id]} kommer</div>`:'';
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',leder:false,memELd:'',memEA:'',memEL:'',memEM:'',memGL:[],memGM:[],snaps:null,snapMsg:'',view:'meg',acc:{},sel:{},groups:[],leads:[],ulOpen:'',psMal:'alle',psGr:[],ugOpen:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',leder:false,memELd:'',memEA:'',memEL:'',memEM:'',memGL:[],memGM:[],snaps:null,snapMsg:'',view:'meg',af:'Alle',acc:{},sel:{},groups:[],leads:[],ulOpen:'',psMal:'alle',psGr:[],ugOpen:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
 state.member=false;state.admin=false;state.user=null;
 {const dt=new URLSearchParams(location.search).get('tab');if(['home','prog','news','me'].includes(dt)){state.tab=dt;try{history.replaceState(null,'',location.pathname)}catch(e){}}}
@@ -331,7 +331,7 @@ function fields(t,ed){return FIELDS[t].filter(f=>(f[0]!=='push'||(PUSH_URL&&!ed)
   if(b==='sel')return `<label class="f">${l}<select name="${k}">${o.map(x=>`<option value="${x}" ${String(v==null?o[0]:(k==='cat'?normCat(v):v))===String(x)?'selected':''}>${k==='day'?cap(DAYS[x]):x}</option>`).join('')}</select></label>`;
   if(b==='chk')return `<label class="f" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="${k}" style="width:auto" ${v?'checked':''}>${l}</label>`;
   return `<label class="f">${l}<input name="${k}" type="${b}" ${req?'required':''} value="${esc(v)}"></label>`}).join('')}
-function admItems(t){const l=t==='events'?rawEvents.slice().sort((a,b)=>a.start<b.start?-1:1):t==='posts'?posts:regular;return state.admin?l:l.filter(ledItem)}
+function admItems(t){const l=t==='events'?rawEvents.slice().sort((a,b)=>a.start<b.start?-1:1):t==='posts'?posts:regular;const f=t==='posts'||state.af==='Alle'?l:l.filter(x=>normCat(x.cat)===state.af);return state.admin?f:f.filter(ledItem)}
 function admLabel(t,x){return t==='events'?`${esc(x.start)} · ${esc(x.title)}${x.groups&&x.groups.length?' <span class="small">('+esc(x.groups.map(gName).join(', '))+')</span>':''}${x.hideHome?' <span class="small">(skjult på Hjem)</span>':''}`:t==='posts'?esc(x.t)+(x.tag&&x.tag!=='Alle'?' <span class="small">('+esc(x.tag)+')</span>':'')+(x.hideHome?' <span class="small">(skjult på Hjem)</span>':''):`${cap(DAYS[x.day])} ${esc(x.time)} · ${esc(x.title)}`}
 function admin(){
   const t=state.adm.type,items=admItems(t),ed=state.adm.edit?items.find(x=>x.id==state.adm.edit):null;
@@ -343,6 +343,7 @@ function admin(){
    <div class="btns"><button class="btn primary" type="submit" style="width:auto">${ed?'Lagre endring':'Legg til'}</button>${ed?'<button class="btn" type="button" data-acancel>Avbryt</button>':''}</div></form>
   <p class="small" role="status" style="margin:8px 0 0">${esc(state.msg)}</p>
   <details class="acc sub" data-acc="eks" ${state.acc.eks?'open':''}><summary><h3>Eksisterende ${({events:'arrangementer',posts:'nyheter',regular:'faste samlinger'})[t]} (${items.length})</h3></summary>
+  ${t==='posts'?'':`<div class="chips" style="margin:4px 0 8px">${['Alle',...CATS.filter(canSeeCat)].map(c=>`<button class="chip" data-af="${c}" aria-pressed="${state.af===c}">${c}</button>`).join('')}</div>`}
   ${items.length?`<div class="btns" style="align-items:center;margin:4px 0 8px"><label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" data-aselall style="width:22px;height:22px" ${nSel===items.length?'checked':''}>Velg alle</label>
   <button class="btn" data-adelsel ${nSel?'':'disabled'}>Slett valgte (${nSel})</button></div>`:''}
   <div class="reg">${items.map(x=>`<div class="r"><input type="checkbox" data-asel="${esc(x.id)}" aria-label="Velg" style="width:22px;height:22px;flex:none;align-self:center" ${state.sel[x.id]?'checked':''}><div class="grow">${admLabel(t,x)}</div><button class="btn" data-aedit="${esc(x.id)}">Rediger</button><button class="btn" data-adel="${esc(x.id)}">Slett</button></div>`).join('')||'<p class="small">Ingenting ennå.</p>'}</div></details></details>`}
@@ -475,6 +476,7 @@ document.addEventListener('click',async e=>{
   else if(c.dataset.rsvp){
     if(state.rsvp[c.dataset.rsvp])await setRsvp(c.dataset.rsvp,false);else openRsvp(c.dataset.rsvp)}
   else if('rscancel' in c.dataset){$('#rsDlg').close();rsPending=null}
+  else if(c.dataset.af){state.af=c.dataset.af;state.sel={};keep(()=>{})}
   else if(c.dataset.f){state.filter=c.dataset.f;keep(()=>{})}
   else if(c.dataset.pref){keep(()=>{state.prefs[c.dataset.pref]=!state.prefs[c.dataset.pref];save()})}
   else if(c.dataset.ledertoggle){
