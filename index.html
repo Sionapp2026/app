@@ -177,7 +177,7 @@ function ago(p){
 const cnt=id=>counts[id]>0?`<div class="small">${counts[id]} kommer</div>`:'';
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',sel:{},backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',sel:{},backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
 state.member=false;state.admin=false;state.user=null;
 {const dt=new URLSearchParams(location.search).get('tab');if(['home','prog','news','me'].includes(dt)){state.tab=dt;try{history.replaceState(null,'',location.pathname)}catch(e){}}}
@@ -333,6 +333,7 @@ function pushAdmin(){
   <label class="f">Tekst<textarea id="psB" rows="3" maxlength="500">${esc(state.psB)}</textarea></label>
   <p class="small" style="margin:-4px 0 0">Varselet viser de første 140 tegnene. Hele teksten ligger i Nyheter.</p>
   <label class="f" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="psNews" style="width:auto" ${state.psNews?'checked':''}>Legg også ut som nyhet i appen</label>
+  <label class="f" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="psHide" style="width:auto" ${state.psHide?'checked':''}>Ikke vis nyheten på Hjem (vises i Nyheter)</label>
   <label class="f">Når noen trykker på varselet, åpnes<select id="psTab">${[['news','Nyheter'],['home','Hjem'],['prog','Program']].map(([v,l])=>`<option value="${v}" ${state.psTab===v?'selected':''}>${l}</option>`).join('')}</select></label>
   <button class="btn primary" type="submit">Send varsel</button></form>
   <p class="small" role="status" style="margin:8px 0 0">${esc(state.pushSendMsg)}</p></div>`}
@@ -466,13 +467,13 @@ document.addEventListener('submit',async e=>{
     try{const em=$('#lE').value.trim(),pw=$('#lP').value;await FB.login(em,pw);state.err='';
       try{if(window.PasswordCredential)await navigator.credentials.store(new PasswordCredential({id:em,password:pw,name:em}))}catch(x){}}catch(er){keep(()=>state.err=authMsg(er.code))}}
   else if(f.id==='pushsend'){e.preventDefault();
-    const t=$('#psT').value.trim(),b=$('#psB').value.trim(),tab=$('#psTab').value,asNews=$('#psNews').checked;
+    const t=$('#psT').value.trim(),b=$('#psB').value.trim(),tab=$('#psTab').value,asNews=$('#psNews').checked,hide=$('#psHide').checked;
     if(!t)return;
     if(!confirm('Sende «'+t+'» til alle som har slått på varsler'+(asNews?' og legge den ut som nyhet':'')+'?'))return;
-    state.psT=t;state.psB=b;state.psTab=tab;state.psNews=asNews;keep(()=>state.pushSendMsg='Sender ...');
+    state.psT=t;state.psB=b;state.psTab=tab;state.psNews=asNews;state.psHide=hide;keep(()=>state.pushSendMsg='Sender ...');
     // Nyheten legges ut først, så varselet aldri peker til noe som ikke finnes.
     if(asNews){
-      try{await FB.add('posts',{t,b,tag:'Alle',m:false});usingFb=true}
+      try{await FB.add('posts',{t,b,tag:'Alle',m:false,hideHome:hide});usingFb=true}
       catch(er){keep(()=>state.pushSendMsg='Kunne ikke legge ut nyheten ('+((er&&er.code)||'feil')+'). Varselet er ikke sendt.');return}
     }
     const kort=b.length>140?b.slice(0,137)+'…':b;
