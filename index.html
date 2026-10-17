@@ -348,14 +348,14 @@ function admin(){
   return `<details class="card acc" data-acc="adm" ${state.acc.adm?'open':''}><summary><h2>${state.admin?'Legg inn og rediger':'Publiser for gruppene dine'}</h2></summary>
   ${usingFb||!state.admin?'':`<p class="small" style="margin:8px 0">Databasen er tom, og appen viser innholdet fra JSON-filene. Flytt det over først, ellers forsvinner det når du legger til noe nytt.</p><button class="btn" data-aimport>Flytt eksisterende innhold til databasen</button>`}
   <div class="chips" style="margin:12px 0">${TYPES.filter(([k])=>state.admin||k!=='regular').map(([k,l])=>`<button class="chip" data-at="${k}" aria-pressed="${t===k}">${l}</button>`).join('')}</div>
+  ${state.adm.form||ed?`<form class="form" id="adm" data-type="${t}">${fields(t,ed)}
+   <div class="btns"><button class="btn primary" type="submit" style="width:auto">${ed?'Lagre endring':'Legg til'}</button><button class="btn" type="button" data-acancel>Avbryt</button></div></form>`:`<button class="btn primary" data-anew style="width:auto;margin-top:12px">+ Legg til ${({events:'nytt arrangement',posts:'ny nyhet',regular:'ny fast samling'})[t]}</button>`}
+  <p class="small" role="status" style="margin:8px 0 0">${esc(state.msg)}</p>
   <h3 style="margin:14px 0 6px;font-size:19px">Eksisterende ${({events:'arrangementer',posts:'nyheter',regular:'faste samlinger'})[t]} (${items.length})</h3>
   ${t==='posts'?'':`<div class="chips" style="margin:4px 0 8px">${['Alle',...CATS.filter(canSeeCat)].map(c=>`<button class="chip" data-af="${c}" aria-pressed="${state.af===c}">${c}</button>`).join('')}</div>`}
   ${items.length?`<div class="btns" style="align-items:center;margin:4px 0 8px"><label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" data-aselall style="width:22px;height:22px" ${nSel===items.length?'checked':''}>Velg alle</label>
   <button class="btn" data-adelsel ${nSel?'':'disabled'}>Slett valgte (${nSel})</button></div>`:''}
   <div class="reg">${items.map(x=>`<div class="r"><input type="checkbox" data-asel="${esc(x.id)}" aria-label="Velg" style="width:22px;height:22px;flex:none;align-self:center" ${state.sel[x.id]?'checked':''}><div class="grow">${admLabel(t,x)}</div><button class="btn" data-aedit="${esc(x.id)}">Rediger</button><button class="btn" data-adel="${esc(x.id)}">Slett</button></div>`).join('')||'<p class="small">Ingenting ennå.</p>'}</div>
-  ${state.adm.form||ed?`<form class="form" id="adm" data-type="${t}">${fields(t,ed)}
-   <div class="btns"><button class="btn primary" type="submit" style="width:auto">${ed?'Lagre endring':'Legg til'}</button><button class="btn" type="button" data-acancel>Avbryt</button></div></form>`:`<button class="btn primary" data-anew style="width:auto;margin-top:12px">+ Legg til ${({events:'nytt arrangement',posts:'ny nyhet',regular:'ny fast samling'})[t]}</button>`}
-  <p class="small" role="status" style="margin:8px 0 0">${esc(state.msg)}</p>
   </details>`}
 
 const EYE='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
