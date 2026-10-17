@@ -347,14 +347,15 @@ function admin(){
   return `<details class="card acc" data-acc="adm" ${state.acc.adm?'open':''}><summary><h2>${state.admin?'Legg inn og rediger':'Publiser for gruppene dine'}</h2></summary>
   ${usingFb||!state.admin?'':`<p class="small" style="margin:8px 0">Databasen er tom, og appen viser innholdet fra JSON-filene. Flytt det over først, ellers forsvinner det når du legger til noe nytt.</p><button class="btn" data-aimport>Flytt eksisterende innhold til databasen</button>`}
   <div class="chips" style="margin:12px 0">${TYPES.filter(([k])=>state.admin||k!=='regular').map(([k,l])=>`<button class="chip" data-at="${k}" aria-pressed="${t===k}">${l}</button>`).join('')}</div>
-  <form class="form" id="adm" data-type="${t}">${fields(t,ed)}
-   <div class="btns"><button class="btn primary" type="submit" style="width:auto">${ed?'Lagre endring':'Legg til'}</button>${ed?'<button class="btn" type="button" data-acancel>Avbryt</button>':''}</div></form>
-  <p class="small" role="status" style="margin:8px 0 0">${esc(state.msg)}</p>
-  <details class="acc sub" data-acc="eks" ${state.acc.eks?'open':''}><summary><h3>Eksisterende ${({events:'arrangementer',posts:'nyheter',regular:'faste samlinger'})[t]} (${items.length})</h3></summary>
+  <h3 style="margin:14px 0 6px;font-size:19px">Eksisterende ${({events:'arrangementer',posts:'nyheter',regular:'faste samlinger'})[t]} (${items.length})</h3>
   ${t==='posts'?'':`<div class="chips" style="margin:4px 0 8px">${['Alle',...CATS.filter(canSeeCat)].map(c=>`<button class="chip" data-af="${c}" aria-pressed="${state.af===c}">${c}</button>`).join('')}</div>`}
   ${items.length?`<div class="btns" style="align-items:center;margin:4px 0 8px"><label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" data-aselall style="width:22px;height:22px" ${nSel===items.length?'checked':''}>Velg alle</label>
   <button class="btn" data-adelsel ${nSel?'':'disabled'}>Slett valgte (${nSel})</button></div>`:''}
-  <div class="reg">${items.map(x=>`<div class="r"><input type="checkbox" data-asel="${esc(x.id)}" aria-label="Velg" style="width:22px;height:22px;flex:none;align-self:center" ${state.sel[x.id]?'checked':''}><div class="grow">${admLabel(t,x)}</div><button class="btn" data-aedit="${esc(x.id)}">Rediger</button><button class="btn" data-adel="${esc(x.id)}">Slett</button></div>`).join('')||'<p class="small">Ingenting ennå.</p>'}</div></details></details>`}
+  <div class="reg">${items.map(x=>`<div class="r"><input type="checkbox" data-asel="${esc(x.id)}" aria-label="Velg" style="width:22px;height:22px;flex:none;align-self:center" ${state.sel[x.id]?'checked':''}><div class="grow">${admLabel(t,x)}</div><button class="btn" data-aedit="${esc(x.id)}">Rediger</button><button class="btn" data-adel="${esc(x.id)}">Slett</button></div>`).join('')||'<p class="small">Ingenting ennå.</p>'}</div>
+  ${state.adm.form||ed?`<form class="form" id="adm" data-type="${t}">${fields(t,ed)}
+   <div class="btns"><button class="btn primary" type="submit" style="width:auto">${ed?'Lagre endring':'Legg til'}</button><button class="btn" type="button" data-acancel>Avbryt</button></div></form>`:`<button class="btn primary" data-anew style="width:auto;margin-top:12px">+ Legg til ${({events:'nytt arrangement',posts:'ny nyhet',regular:'ny fast samling'})[t]}</button>`}
+  <p class="small" role="status" style="margin:8px 0 0">${esc(state.msg)}</p>
+  </details>`}
 
 const EYE='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYEOFF='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.7C3.7 8.5 2 12 2 12s3.6 7 10 7c1.6 0 3-.4 4.3-1M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
@@ -575,9 +576,10 @@ document.addEventListener('click',async e=>{
   else if('reset' in c.dataset){const m=$('#lE').value.trim();
     if(!m){keep(()=>state.err='Skriv inn e-postadressen din først.');return}
     try{await FB.reset(m);keep(()=>state.err='Hvis adressen er registrert, er en lenke for nytt passord sendt.')}catch(er){keep(()=>state.err=authMsg(er.code))}}
-  else if(c.dataset.at){keep(()=>{state.adm={type:c.dataset.at,edit:null};state.msg='';state.sel={}})}
+  else if(c.dataset.at){keep(()=>{state.adm={type:c.dataset.at,edit:null,form:false};state.msg='';state.sel={}})}
   else if(c.dataset.aedit){keep(()=>{state.adm.edit=c.dataset.aedit;state.msg='';state.acc.adm=true});setTimeout(()=>{const f=$('#adm');if(f)f.scrollIntoView({block:'start'})},60)}
-  else if('acancel' in c.dataset){keep(()=>{state.adm.edit=null;state.msg=''})}
+  else if('anew' in c.dataset){keep(()=>{state.adm.form=true;state.adm.edit=null;state.msg=''});setTimeout(()=>{const f=$('#adm');if(f)f.scrollIntoView({block:'start'})},60)}
+  else if('acancel' in c.dataset){keep(()=>{state.adm.edit=null;state.adm.form=false;state.msg=''})}
   else if('adelsel' in c.dataset){
     const t=state.adm.type,ids=admItems(t).filter(x=>state.sel[x.id]).map(x=>String(x.id));
     if(!ids.length)return;
@@ -691,7 +693,7 @@ document.addEventListener('submit',async e=>{
     const isEdit=!!state.adm.edit;
     try{
       if(state.adm.edit)await FB.set(COL[t],state.adm.edit,d);else await FB.add(COL[t],d);
-      state.msg='Lagret.';state.adm.edit=null;usingFb=true;
+      state.msg='Lagret.';state.adm.edit=null;state.adm.form=false;usingFb=true;
       if(wantPush&&!isEdit){
         const mal=d.groups&&d.groups.length?{type:'grupper',groups:d.groups}:d.m?{type:'medlem'}:{type:'alle'};
         try{const r=await FB.sendPush(PUSH_URL,d.t,String(d.b||'').slice(0,140),'news',mal);state.msg='Lagret. '+(r.ok?'Varsel sendt til '+r.sendt+' av '+r.enheter+' enheter ('+malTekst(mal)+').':'Varsel ikke sendt: '+r.feil)}catch(x){state.msg='Lagret. Varsel kunne ikke sendes (ingen kontakt med varseltjenesten).'}
