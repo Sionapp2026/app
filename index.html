@@ -317,7 +317,7 @@ function news(){
    if(p.m&&!state.member)return `<div class="card locked"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><div><b style="color:var(--ink)">${esc(p.t)}</b><div class="small">Logg inn som medlem for å lese.</div></div></div>`;
    return `<div class="card post"${state.admin&&state.view==='meg'?` data-lp="posts:${p.id}"`:''}><div class="head">${isNew(p)?'<span class="dot" title="Ulest"></span>':''}${postTags(p)}<span class="small">${esc(ago(p))}</span></div><h3>${esc(p.t)}</h3><div class="small" style="color:var(--ink)">${esc(p.b)}</div></div>`}).join('');
   const kan=state.view==='meg'&&(state.admin||isLeader());
-  return `<h1>Nyheter</h1><div class="list">${l||'<p class="small">Ingen nyheter ennå.</p>'}</div>${kan?'<div class="lpzone"><span class="small">Hold inne på en tom plass på siden for å publisere en nyhet.</span></div>':''}`}
+  return `<h1>Nyheter</h1><div class="list">${l||'<p class="small">Ingen nyheter ennå.</p>'}</div>${kan?'<div class="lpzone" style="flex-direction:column;gap:10px;justify-content:flex-end;align-items:center"><button class="btn primary" data-pubnew style="width:auto">+ Ny melding</button><span class="small">Du kan også holde inne på en tom plass på siden.</span></div>':''}`}
 
 /* ---------- Innlogging og administrasjon ---------- */
 const CATS=['Møte','Samling','Ledersamling','Menighetsmøte','Happeninger','Ungdom'];
@@ -366,7 +366,7 @@ function fields(t,ed){return FIELDS[t].filter(f=>(f[0]!=='push'||(PUSH_URL&&!ed)
     return `<label class="f">${l}<select name="${k}Sel">${o.map(x=>`<option value="${x}" ${cur===x?'selected':''}>${x}</option>`).join('')}${req?'':`<option value="" ${cur===''?'selected':''}>Ikke oppgitt</option>`}<option value="__annet" ${cur==='__annet'?'selected':''}>Annet</option></select><input name="${k}" type="${it}" value="${known?'':esc(v)}" ${known?'hidden':''}></label>`}
   if(b==='multi'){
     const isAud=k==='audience';
-    const cur=ed?(ed[k]&&ed[k].length?ed[k]:(isAud&&state.admin?[ed.tag||'Alle']:[])):(isAud&&state.admin?['Alle']:[]);
+    const cur=ed?(ed[k]&&ed[k].length?ed[k]:(isAud&&state.admin?[ed.tag||'Alle']:[])):(isAud?(state.admin?['Alle']:myGroupOptions().length===1?myGroupOptions():[]):[]);
     const nm=x=>x==='Alle'?'Alle (åpen for alle)':x==='Medlem'?'Bare medlemmer (innloggede)':gLabel(x);
     const tips=!state.admin?'Velg minst én av gruppene du leder. Bare medlemmer i gruppene og administratorer ser innholdet.':isAud?'Velger du ingenting, blir nyheten åpen for alle. «Bare medlemmer» krever innlogging. Velger du grupper, er det bare medlemmer i de gruppene (og administratorer) som ser nyheten.':'Velger du ingen grupper, gjelder arrangementet alle.';
     return `<fieldset class="f" style="border:0;padding:0;margin:0"><legend style="font-weight:600;font-size:14px;margin-bottom:4px">${l}</legend>${(state.admin?o:myGroupOptions()).map(x=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="${k}" value="${x}" style="width:22px;height:22px;flex:none" ${cur.includes(x)?'checked':''}>${esc(nm(x))}</label>`).join('')}<span class="small">${tips}</span></fieldset>`}
@@ -620,6 +620,7 @@ document.addEventListener('click',async e=>{
     try{await FB.reset(m);keep(()=>state.err='Hvis adressen er registrert, er en lenke for nytt passord sendt.')}catch(er){keep(()=>state.err=authMsg(er.code))}}
   else if(c.dataset.at){keep(()=>{state.adm={type:c.dataset.at,edit:null,form:false};state.msg='';state.sel={}})}
   else if(c.dataset.aedit){keep(()=>{state.adm.edit=c.dataset.aedit;state.msg='';state.acc.adm=true});setTimeout(()=>{const f=$('#adm');if(f)f.scrollIntoView({block:'start'})},60)}
+  else if('pubnew' in c.dataset){pubAsk()}
   else if('anew' in c.dataset){keep(()=>{state.adm.form=true;state.adm.edit=null;state.msg=''});setTimeout(()=>{const f=$('#adm');if(f)f.scrollIntoView({block:'start'})},60)}
   else if('acancel' in c.dataset){keep(()=>{state.adm.edit=null;state.adm.form=false;state.msg=''})}
   else if('adelsel' in c.dataset){
@@ -757,8 +758,9 @@ function pubAsk(){
   if(document.querySelector('dialog.pub'))return;
   state.adm={type:'posts',edit:null,form:false};state.msg='';
   const dlg=document.createElement('dialog');dlg.className='lp pub';
-  dlg.innerHTML='<h3 style="margin:0 0 10px">Ny nyhet</h3><form class="form" id="adm" data-type="posts">'+fields('posts',null)+'<div class="btns"><button class="btn primary" type="submit" style="width:auto">Send melding</button><button class="btn" type="button" data-pubclose>Avbryt</button></div></form><p class="small" role="status" id="pubMsg" style="margin:8px 0 0"></p>';
+  dlg.innerHTML='<h3 style="margin:0 0 4px">Ny melding</h3><p class="small" style="margin:0 0 10px">'+(state.admin?'Velg hvem som skal få den under Målgruppe.':'Meldingen går bare til gruppen du leder.')+'</p><form class="form" id="adm" data-type="posts">'+fields('posts',null)+'<div class="btns"><button class="btn primary" type="submit" style="width:auto">Send melding</button><button class="btn" type="button" data-pubclose>Avbryt</button></div></form><p class="small" role="status" id="pubMsg" style="margin:8px 0 0"></p>';
   document.body.appendChild(dlg);
+  const pc=dlg.querySelector('[name=push]');if(pc)pc.checked=true;
   const iv=setInterval(()=>{const m=$('#pubMsg');if(m)m.textContent=state.msg},300);
   dlg.addEventListener('click',e=>{if(e.target.closest('[data-pubclose]'))dlg.close()});
   dlg.addEventListener('close',()=>{clearInterval(iv);dlg.remove();state.msg=''});
