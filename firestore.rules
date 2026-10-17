@@ -9,10 +9,24 @@ service cloud.firestore {
     function isMember() {
       return signedIn() && (isAdmin() || exists(/databases/$(database)/documents/members/$(request.auth.token.email)));
     }
+    // Gruppeledere: medlemmer med feltet leads på oppføringen sin i members (satt av administrator). De kan opprette, endre og slette
+    // nyheter og arrangementer som bare gjelder grupper de leder (groups er ikke tom og ligger innenfor leads, og innholdet er medlemsinnhold).
+    function myLeads() {
+      return get(/databases/$(database)/documents/members/$(request.auth.token.email)).data.get('leads', []);
+    }
+    function isLeader() {
+      return signedIn() && exists(/databases/$(database)/documents/members/$(request.auth.token.email)) && myLeads().size() > 0;
+    }
+    function ledGroups(g) {
+      return g is list && g.size() > 0 && g.hasOnly(myLeads());
+    }
     // Åpent innhold kan alle lese. Innhold merket m == true krever at brukeren er medlem.
     match /{col}/{id} {
       allow read: if col in ['events', 'posts', 'regular'] && (resource.data.m == false || isMember());
       allow write: if col in ['events', 'posts', 'regular'] && isAdmin();
+      allow create: if col in ['events', 'posts'] && isLeader() && ledGroups(request.resource.data.get('groups', [])) && request.resource.data.get('m', false) == true;
+      allow update: if col in ['events', 'posts'] && isLeader() && ledGroups(resource.data.get('groups', [])) && ledGroups(request.resource.data.get('groups', [])) && request.resource.data.get('m', false) == true;
+      allow delete: if col in ['events', 'posts'] && isLeader() && ledGroups(resource.data.get('groups', []));
     }
     // «Jeg kommer»-teller per arrangement. Alle kan lese og endre tallet med ett om gangen, bare administratorer kan slette.
     match /rsvpCounts/{id} {

@@ -177,7 +177,7 @@ function ago(p){
 const cnt=id=>counts[id]>0?`<div class="small">${counts[id]} kommer</div>`:'';
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',sel:{},groups:[],psMal:'alle',psGr:[],ugOpen:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',sel:{},groups:[],leads:[],ulOpen:'',psMal:'alle',psGr:[],ugOpen:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
 state.member=false;state.admin=false;state.user=null;
 {const dt=new URLSearchParams(location.search).get('tab');if(['home','prog','news','me'].includes(dt)){state.tab=dt;try{history.replaceState(null,'',location.pathname)}catch(e){}}}
@@ -277,7 +277,11 @@ const GR_IDS=GROUPS.map(g=>g[0]);
 const gName=id=>{const g=GROUPS.find(x=>x[0]===id);return g?g[1]:id};
 const gLabel=id=>{const g=GROUPS.find(x=>x[0]===id);return g?g[1]+(g[2]?' ('+g[2]+')':''):id};
 /* Innhold med grupper vises bare for administratorer og medlemmer i minst én av gruppene. Dette er en visning i appen; sikkerheten for «bare medlemmer» ligger i databasen. */
-const canSee=x=>!(x.groups&&x.groups.length)||state.admin||(state.groups||[]).some(g=>x.groups.includes(g));
+const canSee=x=>!(x.groups&&x.groups.length)||state.admin||(state.groups||[]).concat(state.leads||[]).some(g=>x.groups.includes(g));
+/* Gruppeledere (leads på oppføringen i members) kan bare publisere til gruppene de leder. Det håndheves i databasen (firestore.rules) og i varselscriptet. */
+const isLeader=()=>!state.admin&&(state.leads||[]).length>0;
+const myGroupOptions=()=>state.admin?GR_IDS:(state.leads||[]);
+const ledItem=x=>(x.groups||[]).length>0&&(x.groups||[]).every(g=>(state.leads||[]).includes(g));
 const malTekst=m=>m.type==='grupper'?'gruppene '+m.groups.map(gName).join(', '):m.type==='medlem'?'medlemmer':'alle';
 const postTags=p=>(p.groups&&p.groups.length?p.groups.map(gName):(p.audience&&p.audience.length?p.audience:[p.tag||'Alle'])).map(a=>`<span class="tag ${a==='Medlem'?'m':''}">${esc(a)}</span>`).join(' ');
 const PLACES=['Kometvegen 7','Åndalsnes','Eidsvåg','Eide','Tingvoll'],TIMES=['11:00','12:00','19:00'];
@@ -288,28 +292,28 @@ const FIELDS={
  regular:[['title','Tittel','text*'],['day','Ukedag','sel',[1,2,3,4,5,6,0]],['time','Klokkeslett','combo*',TIMES,'time'],['note','Merknad','text'],['cat','Kategori','sel',CATS]]};
 const COL={events:'events',posts:'posts',regular:'regular'};
 const TYPES=[['events','Arrangement'],['posts','Nyhet'],['regular','Fast samling']];
-function fields(t,ed){return FIELDS[t].filter(f=>f[0]!=='push'||(PUSH_URL&&!ed)).map(([k,l,ty,o,it])=>{
+function fields(t,ed){return FIELDS[t].filter(f=>(f[0]!=='push'||(PUSH_URL&&!ed))&&(state.admin||f[0]!=='m')).map(([k,l,ty,o,it])=>{
   const req=ty.endsWith('*'),b=ty.replace('*',''),v=ed?ed[k]:undefined;
   if(b==='combo'){const known=!v||o.includes(v),cur=!ed?o[0]:!v?(req?o[0]:''):known?v:'__annet';
     return `<label class="f">${l}<select name="${k}Sel">${o.map(x=>`<option value="${x}" ${cur===x?'selected':''}>${x}</option>`).join('')}${req?'':`<option value="" ${cur===''?'selected':''}>Ikke oppgitt</option>`}<option value="__annet" ${cur==='__annet'?'selected':''}>Annet</option></select><input name="${k}" type="${it}" value="${known?'':esc(v)}" ${known?'hidden':''}></label>`}
   if(b==='multi'){
     const isAud=k==='audience';
-    const cur=ed?(ed[k]&&ed[k].length?ed[k]:(isAud?[ed.tag||'Alle']:[])):(isAud?['Alle']:[]);
+    const cur=ed?(ed[k]&&ed[k].length?ed[k]:(isAud&&state.admin?[ed.tag||'Alle']:[])):(isAud&&state.admin?['Alle']:[]);
     const nm=x=>x==='Alle'?'Alle (åpen for alle)':x==='Medlem'?'Bare medlemmer (innloggede)':gLabel(x);
-    const tips=isAud?'Velger du ingenting, blir nyheten åpen for alle. «Bare medlemmer» krever innlogging. Velger du grupper, er det bare medlemmer i de gruppene (og administratorer) som ser nyheten.':'Velger du ingen grupper, gjelder arrangementet alle.';
-    return `<fieldset class="f" style="border:0;padding:0;margin:0"><legend style="font-weight:600;font-size:14px;margin-bottom:4px">${l}</legend>${o.map(x=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="${k}" value="${x}" style="width:22px;height:22px;flex:none" ${cur.includes(x)?'checked':''}>${esc(nm(x))}</label>`).join('')}<span class="small">${tips}</span></fieldset>`}
+    const tips=!state.admin?'Velg minst én av gruppene du leder. Bare medlemmer i gruppene og administratorer ser innholdet.':isAud?'Velger du ingenting, blir nyheten åpen for alle. «Bare medlemmer» krever innlogging. Velger du grupper, er det bare medlemmer i de gruppene (og administratorer) som ser nyheten.':'Velger du ingen grupper, gjelder arrangementet alle.';
+    return `<fieldset class="f" style="border:0;padding:0;margin:0"><legend style="font-weight:600;font-size:14px;margin-bottom:4px">${l}</legend>${(state.admin?o:myGroupOptions()).map(x=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="${k}" value="${x}" style="width:22px;height:22px;flex:none" ${cur.includes(x)?'checked':''}>${esc(nm(x))}</label>`).join('')}<span class="small">${tips}</span></fieldset>`}
   if(b==='area')return `<label class="f">${l}<textarea name="${k}" rows="3" ${req?'required':''}>${esc(v)}</textarea></label>`;
   if(b==='sel')return `<label class="f">${l}<select name="${k}">${o.map(x=>`<option value="${x}" ${String(v==null?o[0]:(k==='cat'?normCat(v):v))===String(x)?'selected':''}>${k==='day'?cap(DAYS[x]):x}</option>`).join('')}</select></label>`;
   if(b==='chk')return `<label class="f" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="${k}" style="width:auto" ${v?'checked':''}>${l}</label>`;
   return `<label class="f">${l}<input name="${k}" type="${b}" ${req?'required':''} value="${esc(v)}"></label>`}).join('')}
-function admItems(t){return t==='events'?rawEvents.slice().sort((a,b)=>a.start<b.start?-1:1):t==='posts'?posts:regular}
+function admItems(t){const l=t==='events'?rawEvents.slice().sort((a,b)=>a.start<b.start?-1:1):t==='posts'?posts:regular;return state.admin?l:l.filter(ledItem)}
 function admLabel(t,x){return t==='events'?`${esc(x.start)} · ${esc(x.title)}${x.groups&&x.groups.length?' <span class="small">('+esc(x.groups.map(gName).join(', '))+')</span>':''}${x.hideHome?' <span class="small">(skjult på Hjem)</span>':''}`:t==='posts'?esc(x.t)+(x.tag&&x.tag!=='Alle'?' <span class="small">('+esc(x.tag)+')</span>':'')+(x.hideHome?' <span class="small">(skjult på Hjem)</span>':''):`${cap(DAYS[x.day])} ${esc(x.time)} · ${esc(x.title)}`}
 function admin(){
   const t=state.adm.type,items=admItems(t),ed=state.adm.edit?items.find(x=>x.id==state.adm.edit):null;
   const nSel=items.filter(x=>state.sel[x.id]).length;
-  return `<div class="card"><h2>Administrator</h2>
-  ${usingFb?'':`<p class="small" style="margin:8px 0">Databasen er tom, og appen viser innholdet fra JSON-filene. Flytt det over først, ellers forsvinner det når du legger til noe nytt.</p><button class="btn" data-aimport>Flytt eksisterende innhold til databasen</button>`}
-  <div class="chips" style="margin:12px 0">${TYPES.map(([k,l])=>`<button class="chip" data-at="${k}" aria-pressed="${t===k}">${l}</button>`).join('')}</div>
+  return `<div class="card"><h2>${state.admin?'Administrator':'Publiser for gruppene dine'}</h2>
+  ${usingFb||!state.admin?'':`<p class="small" style="margin:8px 0">Databasen er tom, og appen viser innholdet fra JSON-filene. Flytt det over først, ellers forsvinner det når du legger til noe nytt.</p><button class="btn" data-aimport>Flytt eksisterende innhold til databasen</button>`}
+  <div class="chips" style="margin:12px 0">${TYPES.filter(([k])=>state.admin||k!=='regular').map(([k,l])=>`<button class="chip" data-at="${k}" aria-pressed="${t===k}">${l}</button>`).join('')}</div>
   <form class="form" id="adm" data-type="${t}">${fields(t,ed)}
    <div class="btns"><button class="btn primary" type="submit" style="width:auto">${ed?'Lagre endring':'Legg til'}</button>${ed?'<button class="btn" type="button" data-acancel>Avbryt</button>':''}</div></form>
   <p class="small" role="status" style="margin:8px 0 0">${esc(state.msg)}</p></div>
@@ -330,8 +334,9 @@ function memberCard(){
   <button class="btn primary" type="submit">Opprett bruker</button></form>
   <p class="small" role="status" style="margin:8px 0 0">${esc(state.memMsg)}</p>
   <div class="reg" style="margin-top:8px">${members.map(x=>{const self=x.id===me,adm=x.role==='admin';
-   return `<div class="r" style="flex-wrap:wrap"><div class="grow" style="min-width:60%">${esc(x.id)}${self?' (deg)':''}<br><span class="tag ${adm?'':'m'}">${adm?'Administrator':'Medlem'}</span></div>
+   return `<div class="r" style="flex-wrap:wrap"><div class="grow" style="min-width:60%">${esc(x.id)}${self?' (deg)':''}<br><span class="tag ${adm?'':'m'}">${adm?'Administrator':'Medlem'}</span>${(x.leads||[]).length?' <span class="tag">Gruppeleder</span>':''}</div>
    <details ${state.ugOpen===x.id?'open':''} style="flex-basis:100%"><summary class="small" style="cursor:pointer">Grupper (${(x.groups||[]).length})${(x.groups||[]).length?': '+esc((x.groups||[]).map(gName).join(', ')):''}</summary><div style="display:grid;gap:6px;margin:6px 0">${GROUPS.map(g=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-ug="${esc(x.id)}" data-gid="${g[0]}" style="width:22px;height:22px;flex:none" ${(x.groups||[]).includes(g[0])?'checked':''}>${esc(gLabel(g[0]))}</label>`).join('')}</div></details>
+   ${adm?'':`<details ${state.ulOpen===x.id?'open':''} style="flex-basis:100%"><summary class="small" style="cursor:pointer">Leder for (${(x.leads||[]).length})${(x.leads||[]).length?': '+esc((x.leads||[]).map(gName).join(', ')):''}</summary><div class="small" style="margin:4px 0">Kan publisere nyheter, arrangementer og varsler, men bare til gruppene som er avkrysset. Personen legges også inn i gruppen.</div><div style="display:grid;gap:6px;margin:6px 0">${GROUPS.map(g=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-ul="${esc(x.id)}" data-gid="${g[0]}" style="width:22px;height:22px;flex:none" ${(x.leads||[]).includes(g[0])?'checked':''}>${esc(gLabel(g[0]))}</label>`).join('')}</div></details>`}
    <div class="btns"><button class="btn" data-memreset="${esc(x.id)}">Nytt passord</button>${self?'':`<button class="btn" data-memrole="${esc(x.id)}" data-to="${adm?'member':'admin'}">${adm?'Gjør til medlem':'Gjør til admin'}</button><button class="btn" data-memdel="${esc(x.id)}">Fjern</button>`}</div></div>`}).join('')||'<p class="small">Ingen brukere lagt inn ennå.</p>'}</div></div>`}
 
 function pushCard(){
@@ -351,8 +356,8 @@ function pushAdmin(){
   <p class="small" style="margin:-4px 0 0">Varselet viser de første 140 tegnene. Hele teksten ligger i Nyheter.</p>
   <label class="f" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="psNews" style="width:auto" ${state.psNews?'checked':''}>Legg også ut som nyhet i appen</label>
   <label class="f" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="psHide" style="width:auto" ${state.psHide?'checked':''}>Ikke vis nyheten på Hjem (vises i Nyheter)</label>
-  <label class="f">Hvem skal få varselet?<select id="psMal">${[['alle','Alle som har slått på varsler'],['medlem','Bare medlemmer'],['grupper','Valgte grupper']].map(([v,l])=>`<option value="${v}" ${state.psMal===v?'selected':''}>${l}</option>`).join('')}</select></label>
-  <div id="psGrBox" ${state.psMal==='grupper'?'':'hidden'} style="display:grid;gap:6px">${GROUPS.map(g=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-psgr="${g[0]}" style="width:22px;height:22px;flex:none" ${state.psGr.includes(g[0])?'checked':''}>${esc(gLabel(g[0]))}</label>`).join('')}</div>
+  ${state.admin?`<label class="f">Hvem skal få varselet?<select id="psMal">${[['alle','Alle som har slått på varsler'],['medlem','Bare medlemmer'],['grupper','Valgte grupper']].map(([v,l])=>`<option value="${v}" ${state.psMal===v?'selected':''}>${l}</option>`).join('')}</select></label>`:'<p class="small" style="margin:0">Du kan sende til gruppene du leder.</p>'}
+  <div id="psGrBox" ${!state.admin||state.psMal==='grupper'?'':'hidden'} style="display:grid;gap:6px">${GROUPS.filter(g=>state.admin||(state.leads||[]).includes(g[0])).map(g=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-psgr="${g[0]}" style="width:22px;height:22px;flex:none" ${state.psGr.includes(g[0])?'checked':''}>${esc(gLabel(g[0]))}</label>`).join('')}</div>
   <label class="f">Når noen trykker på varselet, åpnes<select id="psTab">${[['news','Nyheter'],['home','Hjem'],['prog','Program']].map(([v,l])=>`<option value="${v}" ${state.psTab===v?'selected':''}>${l}</option>`).join('')}</select></label>
   <button class="btn primary" type="submit">Send varsel</button></form>
   <p class="small" role="status" style="margin:8px 0 0">${esc(state.pushSendMsg)}</p></div>`}
@@ -364,7 +369,7 @@ function backupCard(){
   <p class="small" role="status" style="margin:8px 0 0">${esc(state.backupMsg)}</p></div>`}
 
 function loginCard(){
-  if(state.user)return `<div class="card"><div class="row"><div class="grow"><b>${state.admin?'Innlogget som administrator':state.member?'Innlogget som medlem':'Innlogget, men ikke på medlemslisten'}</b><div class="small">${esc(state.user.email)}</div></div>
+  if(state.user)return `<div class="card"><div class="row"><div class="grow"><b>${state.admin?'Innlogget som administrator':isLeader()?'Innlogget som gruppeleder':state.member?'Innlogget som medlem':'Innlogget, men ikke på medlemslisten'}</b><div class="small">${esc(state.user.email)}</div></div>
    <button class="btn" data-logout>Logg ut</button></div>
    <details style="margin-top:12px"${state.pwMsg?' open':''}><summary style="cursor:pointer;font-weight:600">Endre passord</summary>
    <form class="form" id="pw" method="post" action="#" style="margin-top:10px"><input type="text" name="username" autocomplete="username" value="${esc(state.user.email)}" readonly tabindex="-1" aria-hidden="true" style="display:none">${pwField('pO','Nåværende passord','current-password')}
@@ -384,7 +389,7 @@ function me(){
   ${pushCard()}
   ${state.user?`<div class="card"><h2>Medlem i flere menigheter?</h2><p class="small" style="margin:6px 0 0">Mange medlemmer står registrert i andre menigheter enn Sion, og da mister vi statsstøtten for dem. <a href="https://person.brreg.no/nb/minside/tros-og-livssyn" target="_blank" rel="noopener">Sjekk her om du er medlem andre steder</a>. Takk for hjelpen!</p></div>`:''}
 
-  ${state.admin?admin()+pushAdmin()+memberCard()+backupCard():''}`}
+  ${state.admin?admin()+pushAdmin()+memberCard()+backupCard():isLeader()?admin()+pushAdmin():''}`}
 
 const VIEWS={home,prog,news,me};
 const SUN='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
@@ -488,7 +493,7 @@ document.addEventListener('submit',async e=>{
   else if(f.id==='pushsend'){e.preventDefault();
     const t=$('#psT').value.trim(),b=$('#psB').value.trim(),tab=$('#psTab').value,asNews=$('#psNews').checked,hide=$('#psHide').checked;
     if(!t)return;
-    const malType=$('#psMal').value,gr=[...document.querySelectorAll('[data-psgr]')].filter(x=>x.checked).map(x=>x.dataset.psgr);
+    const malType=$('#psMal')?$('#psMal').value:'grupper',gr=[...document.querySelectorAll('[data-psgr]')].filter(x=>x.checked).map(x=>x.dataset.psgr);
     if(malType==='grupper'&&!gr.length){keep(()=>state.pushSendMsg='Velg minst én gruppe.');return}
     const mal=malType==='grupper'?{type:'grupper',groups:gr}:malType==='medlem'?{type:'medlem'}:{type:'alle'};
     if(!confirm('Sende «'+t+'» til '+(mal.type==='grupper'?'gruppene '+gr.map(gName).join(', '):mal.type==='medlem'?'medlemmene (de som har slått på varsler)':'alle som har slått på varsler')+(asNews?' og legge den ut som nyhet':'')+'?'))return;
@@ -531,6 +536,12 @@ document.addEventListener('submit',async e=>{
     const t=f.dataset.type,fd=new FormData(f),d={};
     FIELDS[t].forEach(([k,,ty])=>{const b=ty.replace('*','');d[k]=b==='multi'?fd.getAll(k):b==='combo'?(fd.get(k+'Sel')==='__annet'?String(fd.get(k)||'').trim():fd.get(k+'Sel')):b==='chk'?fd.has(k):k==='day'?+fd.get(k):String(fd.get(k)||'').trim()});
     const wantPush=t==='posts'&&!!d.push;if(t==='posts')delete d.push;
+    if(!state.admin){
+      if(t==='regular'){return}
+      const g=(t==='posts'?(d.audience||[]):(d.groups||[])).filter(x=>(state.leads||[]).includes(x));
+      if(!g.length){keep(()=>state.msg='Velg minst én av gruppene du leder.');return}
+      if(t==='posts')d.audience=g;else d.groups=g;
+    }
     if(t==='posts'){
       const a=d.audience||[],gs=a.filter(x=>GR_IDS.includes(x));
       if(a.includes('Alle')||!a.length){d.audience=['Alle'];d.groups=[];d.tag='Alle';d.m=false}
@@ -555,6 +566,13 @@ document.addEventListener('change',async e=>{
   const d=e.target.dataset||{};
   if(e.target.id==='psMal'){state.psMal=e.target.value;const bx=$('#psGrBox');if(bx)bx.hidden=state.psMal!=='grupper';return}
   if('psgr' in d){const s=new Set(state.psGr);e.target.checked?s.add(d.psgr):s.delete(d.psgr);state.psGr=[...s];return}
+  if('ul' in d){
+    const u=members.find(m=>m.id===d.ul);if(!u)return;
+    const sl=new Set(u.leads||[]);e.target.checked?sl.add(d.gid):sl.delete(d.gid);const lead=[...sl];
+    const gr=new Set(u.groups||[]);if(e.target.checked)gr.add(d.gid);const grp=[...gr];
+    try{await FB.setLeads(u.id,lead,grp);u.leads=lead;u.groups=grp;state.ulOpen=u.id;keep(()=>state.memMsg='Gruppeleder lagret for '+u.id+'.')}
+    catch(er){e.target.checked=!e.target.checked;keep(()=>state.memMsg=saveMsg(er.code))}
+    return}
   if('ug' in d){
     const u=members.find(m=>m.id===d.ug);if(!u)return;
     const s=new Set(u.groups||[]);e.target.checked?s.add(d.gid):s.delete(d.gid);const arr=[...s];
@@ -573,6 +591,7 @@ async function start(){
     state.member=!!u&&(state.admin||await FB.isMember(u.email));
     FB.full=state.member;
     state.groups=u&&state.member?await FB.myGroups(u.email):[];
+    state.leads=u&&state.member&&!state.admin?await FB.myLeads(u.email):[];
     if(u&&lsGet('sm-push'))FB.linkPush(lsGet('sm-push')).catch(()=>{});
     await load();
     if(first){first=false;if(state.tab==='news')markSeen();render()}else keep(()=>{});

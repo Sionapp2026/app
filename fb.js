@@ -105,6 +105,9 @@ try{
       for(const c of ['members','admins']){try{const s=await S.getDoc(S.doc(db,c,email));if(s.exists())(s.data().groups||[]).forEach(g=>ut.add(g))}catch(e){}}
       return [...ut];
     },
+    // Gruppene innlogget bruker er leder for (kan publisere til). Settes bare av administratorer, i feltet leads på oppføringen i members.
+    async myLeads(email){try{const s=await S.getDoc(S.doc(db,'members',email));return s.exists()?(s.data().leads||[]):[]}catch(e){return []}},
+    setLeads:(email,leads,groups)=>S.updateDoc(S.doc(db,'members',email),{leads,groups}),
     setGroups:(email,role,groups)=>S.updateDoc(S.doc(db,role==='admin'?'admins':'members',email),{groups}),
     async isMember(email){
       try{return (await S.getDoc(S.doc(db,'members',email))).exists()}catch(e){return false}
@@ -112,7 +115,7 @@ try{
     // Brukere = administratorer (samlingen admins) og medlemmer (samlingen members). Adressen er dokument-ID.
     async listUsers(){
       const [m,a]=await Promise.all([S.getDocs(S.collection(db,'members')),S.getDocs(S.collection(db,'admins'))]);
-      return a.docs.map(d=>({id:d.id,role:'admin',groups:d.data().groups||[]})).concat(m.docs.map(d=>({id:d.id,role:'member',groups:d.data().groups||[]}))).sort((x,y)=>x.id<y.id?-1:1);
+      return a.docs.map(d=>({id:d.id,role:'admin',groups:d.data().groups||[],leads:[]})).concat(m.docs.map(d=>({id:d.id,role:'member',groups:d.data().groups||[],leads:d.data().leads||[]}))).sort((x,y)=>x.id<y.id?-1:1);
     },
     // Legger adressen i riktig liste, oppretter kontoen med et tilfeldig passord og sender en e-post der brukeren velger passord selv.
     async addUser(email,role){
