@@ -805,7 +805,7 @@ function wizStart(dlg,t){
     const gs=f.querySelector('fieldset.f'),ml=f.querySelector('[name=m]'),mlab=ml&&ml.closest('label');
     if(gs&&mlab){
       const bx=document.createElement('div');bx.style.cssText='display:grid;gap:6px';
-      bx.innerHTML=[['alle','Alle (åpent for alle)'],['medlem','Bare medlemmer (innloggede)'],['grupper','Bestemte grupper']].map(([v,l],i)=>'<label style="display:flex;gap:10px;align-items:center;font-weight:600"><input type="radio" name="wizWho" value="'+v+'" '+(i===0?'checked':'')+' style="width:22px;height:22px;flex:none">'+l+'</label>').join('');
+      bx.innerHTML=[['alle','Alle, også de som ikke er logget inn'],['medlem','Bare innloggede medlemmer'],['grupper','Bestemte grupper']].map(([v,l],i)=>'<label style="display:flex;gap:10px;align-items:center;font-weight:600"><input type="radio" name="wizWho" value="'+v+'" '+(i===0?'checked':'')+' style="width:22px;height:22px;flex:none">'+l+'</label>').join('');
       gs.before(bx);gs.style.display='none';mlab.style.display='none';
       const sync=()=>{const v=f.querySelector('[name=wizWho]:checked').value;gs.style.display=v==='grupper'?'':'none';ml.checked=v==='medlem';if(v!=='grupper')gs.querySelectorAll('[name=groups]').forEach(x=>x.checked=false)};
       bx.addEventListener('change',sync);sync();
