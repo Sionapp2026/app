@@ -387,13 +387,12 @@ function fields(t,ed,only){return FIELDS[t].filter(f=>(!only||only.includes(f[0]
 function admItems(t){const l=t==='events'?rawEvents.slice().sort((a,b)=>a.start<b.start?-1:1):t==='posts'?posts:regular;const f=t==='posts'||state.af==='Alle'?l:l.filter(x=>normCat(x.cat)===state.af);return state.admin?f:f.filter(ledItem)}
 function admLabel(t,x){return t==='events'?`${esc(x.start)} · ${esc(x.title)}${x.groups&&x.groups.length?' <span class="small">('+esc(x.groups.map(gName).join(', '))+')</span>':''}${x.hideHome?' <span class="small">(skjult på Hjem)</span>':''}`:t==='posts'?esc(x.t)+(x.tag&&x.tag!=='Alle'?' <span class="small">('+esc(x.tag)+')</span>':'')+(x.hideHome?' <span class="small">(skjult på Hjem)</span>':''):`${cap(DAYS[x.day])} ${esc(x.time)} · ${esc(x.title)}`}
 function admin(){
-  const t=state.adm.type,items=admItems(t),ed=state.adm.edit?items.find(x=>x.id==state.adm.edit):null;
+  const t=state.adm.type,items=admItems(t);
   const nSel=items.filter(x=>state.sel[x.id]).length;
-  return `<details class="card acc" data-acc="adm" ${state.acc.adm?'open':''}><summary><h2>${state.admin?'Legg inn og rediger':'Publiser for gruppene dine'}</h2></summary>
+  return `<details class="card acc" data-acc="adm" ${state.acc.adm?'open':''}><summary><h2>${state.admin?'Rydd i innhold':'Mine publiseringer'}</h2></summary>
+  <p class="small" style="margin:0">Opprett nytt under Program og Nyheter (blyantknappen øverst slår knappene av og på). Her kan du endre eller slette det som er lagt inn, og slette flere samtidig.</p>
   ${usingFb||!state.admin?'':`<p class="small" style="margin:8px 0">Databasen er tom, og appen viser innholdet fra JSON-filene. Flytt det over først, ellers forsvinner det når du legger til noe nytt.</p><button class="btn" data-aimport>Flytt eksisterende innhold til databasen</button>`}
   <div class="chips" style="margin:12px 0">${TYPES.filter(([k])=>state.admin||k!=='regular').map(([k,l])=>`<button class="chip" data-at="${k}" aria-pressed="${t===k}">${l}</button>`).join('')}</div>
-  ${state.adm.form||ed?`<form class="form" id="adm" data-type="${t}">${fields(t,ed)}
-   <div class="btns"><button class="btn primary" type="submit" style="width:auto">${ed?'Lagre endring':t==='posts'?'Send melding':!state.admin?'Send':'Legg til'}</button><button class="btn" type="button" data-acancel>Avbryt</button></div></form>`:`<button class="btn primary" data-anew style="width:auto;margin-top:12px">+ Legg til ${({events:'nytt arrangement',posts:'ny nyhet',regular:'ny fast samling'})[t]}</button>`}
   <p class="small" role="status" style="margin:8px 0 0">${esc(state.msg)}</p>
   <h3 style="margin:14px 0 6px;font-size:19px">Eksisterende ${({events:'arrangementer',posts:'nyheter',regular:'faste samlinger'})[t]} (${items.length})</h3>
   ${t==='posts'?'':`<div class="chips" style="margin:4px 0 8px">${['Alle',...allCats().filter(canSeeCat)].map(c=>`<button class="chip" data-af="${esc(c)}" aria-pressed="${state.af===c}">${esc(c)}</button>`).join('')}</div>`}
@@ -639,7 +638,7 @@ document.addEventListener('click',async e=>{
     if(!m){keep(()=>state.err='Skriv inn e-postadressen din først.');return}
     try{await FB.reset(m);keep(()=>state.err='Hvis adressen er registrert, er en lenke for nytt passord sendt.')}catch(er){keep(()=>state.err=authMsg(er.code))}}
   else if(c.dataset.at){keep(()=>{state.adm={type:c.dataset.at,edit:null,form:false};state.msg='';state.sel={}})}
-  else if(c.dataset.aedit){keep(()=>{state.adm.edit=c.dataset.aedit;state.msg='';state.acc.adm=true});setTimeout(()=>{const f=$('#adm');if(f)f.scrollIntoView({block:'start'})},60)}
+  else if(c.dataset.aedit){editAsk(state.adm.type,c.dataset.aedit)}
   else if('pubnew' in c.dataset){pubAsk()}
   else if('wiz' in c.dataset){wizAsk()}
   else if('anew' in c.dataset){keep(()=>{state.adm.form=true;state.adm.edit=null;state.msg=''});setTimeout(()=>{const f=$('#adm');if(f)f.scrollIntoView({block:'start'})},60)}
@@ -758,7 +757,7 @@ document.addEventListener('submit',async e=>{
     try{
       if(state.adm.edit)await FB.set(COL[t],state.adm.edit,d);else await FB.add(COL[t],d);
       state.msg='Lagret.';state.adm.edit=null;state.adm.form=false;usingFb=true;
-      {const pd=document.querySelector('dialog.pub');if(pd){pd.close();push('Lagret',t==='posts'?'Nyheten er lagt ut.':'Lagt til i programmet.')}}
+      {const pd=document.querySelector('dialog.pub');if(pd){pd.close();push('Lagret',isEdit?'Endringen er lagret.':t==='posts'?'Nyheten er lagt ut.':'Lagt til i programmet.')}}
       if(wantPush&&!isEdit){
         const mal=d.groups&&d.groups.length?{type:'grupper',groups:d.groups}:d.m?{type:'medlem'}:{type:'alle'};
         try{const r=await FB.sendPush(PUSH_URL,d.t,String(d.b||'').slice(0,140),'news',mal);state.msg='Lagret. '+(r.ok?'Varsel sendt til '+r.sendt+' av '+r.enheter+' enheter ('+malTekst(mal)+').':'Varsel ikke sendt: '+r.feil)}catch(x){state.msg='Lagret. Varsel kunne ikke sendes (ingen kontakt med varseltjenesten).'}
@@ -853,6 +852,18 @@ function wizStart(dlg,t){
   f.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.tagName!=='TEXTAREA'){e.preventDefault();if(cur<n-1&&ok())show(cur+1)}});
   show(0);
 }
+function editAsk(t,id){
+  if(document.querySelector('dialog.pub'))return;
+  const ed=admItems(t).find(x=>String(x.id)===String(id));if(!ed)return;
+  state.adm={type:t,edit:ed.id,form:true};state.msg='';
+  const dlg=document.createElement('dialog');dlg.className='lp pub';
+  dlg.innerHTML='<h3 style="margin:0 0 10px">Rediger</h3><form class="form" id="adm" data-type="'+t+'">'+fields(t,ed)+'<div class="btns"><button class="btn primary" type="submit" style="width:auto">Lagre endring</button><button class="btn" type="button" data-pubclose>Avbryt</button></div></form><p class="small" role="status" id="pubMsg" style="margin:8px 0 0"></p>';
+  document.body.appendChild(dlg);
+  const iv=setInterval(()=>{const m=$('#pubMsg');if(m)m.textContent=state.msg},300);
+  dlg.addEventListener('click',e=>{if(e.target.closest('[data-pubclose]'))dlg.close()});
+  dlg.addEventListener('close',()=>{clearInterval(iv);dlg.remove();state.msg='';state.adm.edit=null;state.adm.form=false});
+  dlg.showModal();
+}
 function pubAsk(){
   if(document.querySelector('dialog.pub'))return;
   state.adm={type:'posts',edit:null,form:false};state.msg='';
@@ -908,9 +919,10 @@ function lpAsk(key){
   const tittel=col==='posts'?x.t:x.title,dlg=document.createElement('dialog');dlg.className='lp';
   const mal=col==='posts'?((x.groups||[]).length?{type:'grupper',groups:x.groups}:x.m?{type:'medlem'}:{type:'alle'}):null;
   const pv=col==='posts'&&PUSH_URL?'<div style="display:grid;gap:8px"><b>Send påminnelse</b><span class="small">Nytt varsel til samme målgruppe som nyheten ('+esc(malTekst(mal))+'). Du kan endre teksten.</span><label class="f">Varseltittel<input id="lpPT" maxlength="60" value="'+esc(('Påminnelse: '+x.t).slice(0,60))+'"></label><label class="f">Varseltekst<textarea id="lpPB" rows="3" maxlength="140">'+esc(String(x.b||'').slice(0,140))+'</textarea></label><button class="btn primary" value="varsel" style="width:auto">Send påminnelse</button></div><hr style="border:0;border-top:1px solid var(--line);width:100%">':'';
-  dlg.innerHTML='<form class="form" method="dialog" onkeydown="if(event.key===\'Enter\'&&event.target.tagName===\'INPUT\')event.preventDefault()"><h3 style="margin:0">'+(col==='posts'?'«'+esc(tittel)+'»':'Slette «'+esc(tittel)+'»?')+'</h3>'+pv+'<h3 style="margin:0;font-size:17px">'+(col==='posts'?'Slette nyheten?':'')+'</h3><p class="small" style="margin:0">'+(col==='posts'?'Nyheten':'Arrangementet')+' fjernes for alle. Du kan rulle tilbake under Meg → Sikkerhetskopi og tilbakerulling.</p><div class="btns"><button class="btn danger" value="slett">Slett</button><button class="btn" value="avbryt">Avbryt</button></div></form>';
+  dlg.innerHTML='<form class="form" method="dialog" onkeydown="if(event.key===\'Enter\'&&event.target.tagName===\'INPUT\')event.preventDefault()"><h3 style="margin:0">'+(col==='posts'?'«'+esc(tittel)+'»':'Slette «'+esc(tittel)+'»?')+'</h3>'+pv+'<h3 style="margin:0;font-size:17px">'+(col==='posts'?'Slette nyheten?':'')+'</h3><p class="small" style="margin:0">'+(col==='posts'?'Nyheten':'Arrangementet')+' fjernes for alle. Du kan rulle tilbake under Meg → Sikkerhetskopi og tilbakerulling.</p><div class="btns"><button class="btn" value="rediger">Rediger</button><button class="btn danger" value="slett">Slett</button><button class="btn" value="avbryt">Avbryt</button></div></form>';
   document.body.appendChild(dlg);
   dlg.addEventListener('close',async()=>{const rv=dlg.returnValue,ok=rv==='slett',pt0=dlg.querySelector('#lpPT'),pb0=dlg.querySelector('#lpPB'),tt=pt0?pt0.value.trim():'',bb=pb0?pb0.value.trim():'';dlg.remove();
+    if(rv==='rediger'){editAsk(col,id);return}
     if(rv==='varsel'){
       if(!tt){push('Fyll ut','Skriv en tittel på varselet.');return}
       try{const res=await FB.sendPush(PUSH_URL,tt,bb,'news',mal);push(res.ok?'Påminnelse sendt':'Ikke sendt',res.ok?'Til '+res.sendt+' av '+res.enheter+' enheter ('+malTekst(mal)+').':res.feil)}
