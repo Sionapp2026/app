@@ -44,6 +44,10 @@ try{
     setFastEx:(id,ex)=>S.updateDoc(S.doc(db,'regular',id),{ex}),
     // Grupper (samlingen groups): navn og beskrivelse. Appen bruker innebygde standardgrupper til administrator redigerer første gang.
     async groupsList(){const s=await S.getDocs(S.collection(db,'groups'));return s.docs.map(d=>({id:d.id,...d.data()}))},
+    // Kategorier (samlingen categories): navn og rekkefølge.
+    async catsList(){const s=await S.getDocs(S.collection(db,'categories'));return s.docs.map(d=>({id:d.id,...d.data()}))},
+    setCatDoc:(id,d)=>S.setDoc(S.doc(db,'categories',id),d,{merge:true}),
+    delCatDoc:id=>S.deleteDoc(S.doc(db,'categories',id)),
     setGroupDoc:(id,d)=>S.setDoc(S.doc(db,'groups',id),d,{merge:true}),
     delGroupDoc:id=>S.deleteDoc(S.doc(db,'groups',id)),
     del:(col,id)=>S.deleteDoc(S.doc(db,col,id)),

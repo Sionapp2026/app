@@ -188,6 +188,7 @@ async function fetchAll(){
 }
 async function load(){
   if(FB)try{applyGroups(await FB.groupsList())}catch(e){}
+  if(FB)try{applyCats(await FB.catsList())}catch(e){}
   const [e,p,g]=await fetchAll();
   rawEvents=e;
   events=e.filter(x=>canSee(x)&&canSeeCat(x.cat)).map(x=>({...x,t:esc(x.title),d:esc(x.text),w:new Date(x.start+'T'+(x.time||'00:00')),e:x.end?new Date(x.end+'T23:59'):null}))
@@ -324,8 +325,8 @@ function prog(){
   const kanNy=editOn();
   return `<div class="hd"><h1>Kommende arrangementer</h1><span class="script">sett av datoene!</span></div>${kanNy?'<button class="btn primary" data-wiz style="width:auto">+ Nytt arrangement</button>':''}
   <input type="search" id="progQ" placeholder="Søk i program …" aria-label="Søk i program" autocomplete="off" value="${esc(state.q||'')}">
-  <div class="chips">${cats.map(c=>`<button class="chip" data-f="${esc(c)}"${kanLp&&c!=='Alle'&&!CATS.includes(c)?` data-lp="cat:${encodeURIComponent(c)}"`:''} aria-pressed="${state.filter===c}">${esc(c)}</button>`).join('')}</div>
-  ${kanLp?'<p class="small" style="margin:0 0 8px">Hold inne på et arrangement eller en fast samling for å endre eller slette. Hold inne på en egen kategori for å slette den.</p>':''}
+  <div class="chips">${cats.map(c=>`<button class="chip" data-f="${esc(c)}"${kanLp&&c!=='Alle'&&c!==CAT_LOCKED?` data-lp="cat:${encodeURIComponent(c)}"`:''} aria-pressed="${state.filter===c}">${esc(c)}</button>`).join('')}</div>
+  ${kanLp?'<p class="small" style="margin:0 0 8px">Hold inne på et arrangement eller en fast samling for å endre eller slette. Hold inne på en kategori for å endre navnet eller slette den.</p>':''}
   <div class="list" id="progList">${progList()}</div>`}
 
 function regList(){
@@ -341,9 +342,15 @@ function news(){
   return `<h1>Nyheter</h1>${kan?'<button class="btn primary" data-pubnew style="width:auto">+ Ny melding</button>':''}<div class="list">${l||'<p class="small">Ingen nyheter ennå.</p>'}</div>${kan?'<div class="lpzone"></div>':''}`}
 
 /* ---------- Innlogging og administrasjon ---------- */
-const CATS=['Møte','Samling','Ledersamling','Menighetsmøte','Happeninger','Ungdom'];
+const CATS_DEFAULT=['Møte','Samling','Ledersamling','Menighetsmøte','Happeninger','Ungdom'];
+const CATS=CATS_DEFAULT.slice();   // endres på stedet når administrator har redigert kategoriene (samlingen categories)
+const CAT_LOCKED='Ledersamling';   // styrer hvem som ser innholdet og kan ikke endres eller slettes
+function applyCats(l){
+  const n=l&&l.length?l.slice().sort((a,b)=>((a.ord==null?999:a.ord)-(b.ord==null?999:b.ord))||String(a.name).localeCompare(String(b.name))).map(c=>c.name):CATS_DEFAULT.slice();
+  if(!n.includes(CAT_LOCKED))n.push(CAT_LOCKED);
+  CATS.length=0;n.forEach(c=>CATS.push(c));state.catDb=!!(l&&l.length)}
 /* Kategorier: de seks faste + alle nye som er brukt på et arrangement eller en fast samling (lages av administrator i veiviseren, steg 1). */
-const allCats=()=>[...CATS,...new Set([...rawEvents,...regular].map(x=>normCat(x.cat)).filter(c=>c&&!CATS.includes(c)))];
+const allCats=()=>[...CATS,...new Set([...rawEvents,...regular].map(x=>normCat(x.cat)).filter(c=>c&&!CATS.includes(c)))];   // CATS + eventuelle kategorier som bare finnes på oppføringer
 const normCat=c=>c==='Møter'?'Møte':c;
 /* «Ledersamling» er bare for ledere: administratorer, gruppeledere og medlemmer i gruppen Lederrådet. Andre ser verken kategorien eller arrangementene. */
 /* Visning: «meg» (mine egne rettigheter), «medlem» (vanlig innlogget medlem uten grupper) eller «besok» (ikke innlogget). Påvirker bare hva som vises som innhold. */
@@ -952,23 +959,46 @@ function pubAsk(){
   dlg.addEventListener('close',()=>{clearInterval(iv);dlg.remove();state.msg=''});
   dlg.showModal();
 }
-/* Slett en egen kategori: arrangementer og faste samlinger som bruker den flyttes til en annen kategori. De seks faste kategoriene kan ikke slettes. */
+/* Endre navn på eller slett en kategori. Arrangementer og faste samlinger får nytt navn, eller flyttes til en annen kategori ved sletting. Første endring lagrer kategoriene i databasen. */
+async function catSeed(){
+  if(state.catDb)return;
+  let i=0;for(const c of allCats())await FB.setCatDoc(slug(c),{name:c,ord:i++});
+  applyCats(await FB.catsList())}
 function catAsk(navn){
-  if(!FB||CATS.includes(navn))return;
-  const ev=rawEvents.filter(e=>normCat(e.cat)===navn),rg=regular.filter(r=>normCat(r.cat)===navn);
-  const mål=CATS.filter(c=>c!=='Ledersamling'),dlg=document.createElement('dialog');dlg.className='lp';
-  dlg.innerHTML='<form class="form" method="dialog"><h3 style="margin:0">Slette kategorien «'+esc(navn)+'»?</h3><p class="small" style="margin:0">'+(ev.length||rg.length?'Den brukes av '+ev.length+' arrangement'+(ev.length===1?'':'er')+' og '+rg.length+' fast'+(rg.length===1?'':'e')+' samling'+(rg.length===1?'':'er')+'. De flyttes til kategorien du velger under, og ingenting annet slettes.':'Ingen bruker den.')+'</p>'
-   +(ev.length||rg.length?'<label class="f">Flytt dem til<select id="catTo">'+mål.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join('')+'</select></label>':'')
+  if(!FB||navn===CAT_LOCKED)return;
+  const ev=rawEvents.filter(e=>normCat(e.cat)===navn),rg=regular.filter(r=>normCat(r.cat)===navn),n=ev.length+rg.length;
+  const mål=allCats().filter(c=>c!==CAT_LOCKED&&c!==navn),dlg=document.createElement('dialog');dlg.className='lp';
+  dlg.innerHTML='<form class="form" method="dialog"><h3 style="margin:0">Kategorien «'+esc(navn)+'»</h3><p class="small" style="margin:0">Brukes av '+ev.length+' arrangement'+(ev.length===1?'':'er')+' og '+rg.length+' fast'+(rg.length===1?'':'e')+' samling'+(rg.length===1?'':'er')+'.</p>'
+   +'<label class="f">Nytt navn<input id="cN" maxlength="30" value="'+esc(navn)+'"></label><button class="btn primary" value="navn" style="width:auto">Lagre nytt navn</button>'
+   +'<hr style="border:0;border-top:1px solid var(--line);width:100%">'
+   +'<b>Slette kategorien?</b>'+(n?'<label class="f">Flytt de '+n+' oppføringene til<select id="catTo">'+mål.map(c=>'<option value="'+esc(c)+'">'+esc(c)+'</option>').join('')+'</select></label>':'<span class="small">Ingen bruker den.</span>')
    +'<div class="btns col"><button class="btn danger" value="slett">Slett kategorien</button><button class="btn" value="avbryt">Avbryt</button></div></form>';
   document.body.appendChild(dlg);
-  dlg.addEventListener('close',async()=>{const ok=dlg.returnValue==='slett',til=(dlg.querySelector('#catTo')||{}).value||'Møte';dlg.remove();if(!ok)return;
+  dlg.addEventListener('close',async()=>{
+    const rv=dlg.returnValue,nytt=(dlg.querySelector('#cN').value||'').trim().replace(/\s+/g,' '),til=(dlg.querySelector('#catTo')||{}).value||'Møte';dlg.remove();
+    if(rv!=='navn'&&rv!=='slett')return;
     try{
-      if(ev.length||rg.length){try{await FB.ensureSnapshot('Før sletting av kategori',5*60e3)}catch(er){if(!confirm('Kunne ikke lage et sikkerhetspunkt ('+((er&&er.code)||'feil')+'). Fortsette likevel?'))return}}
+      if(rv==='navn'){
+        if(!nytt||nytt===navn)return;
+        if(allCats().some(c=>c.toLowerCase()===nytt.toLowerCase()&&c!==navn)){push('Finnes allerede','Det finnes en kategori som heter «'+nytt+'».');return}
+        if(nytt.toLowerCase()===CAT_LOCKED.toLowerCase()){push('Ikke mulig','«'+CAT_LOCKED+'» er en spesiell kategori.');return}
+        try{await FB.ensureSnapshot('Før endring av kategori',5*60e3)}catch(er){if(!confirm('Kunne ikke lage et sikkerhetspunkt ('+((er&&er.code)||'feil')+'). Fortsette likevel?'))return}
+        await catSeed();
+        const ord=(await FB.catsList()).find(c=>c.name===navn);
+        for(const e of ev)await FB.set('events',e.id,{cat:nytt});
+        for(const r of rg)await FB.set('regular',r.id,{cat:nytt});
+        await FB.setCatDoc(slug(nytt)+(ord&&slug(nytt)===ord.id?'':''),{name:nytt,ord:ord&&ord.ord!=null?ord.ord:CATS.length});
+        if(ord&&ord.id!==slug(nytt))await FB.delCatDoc(ord.id);
+        if(state.filter===navn)state.filter=nytt;
+        await refresh();push('Navnet er endret','«'+navn+'» heter nå «'+nytt+'».');return}
+      try{await FB.ensureSnapshot('Før sletting av kategori',5*60e3)}catch(er){if(!confirm('Kunne ikke lage et sikkerhetspunkt ('+((er&&er.code)||'feil')+'). Fortsette likevel?'))return}
+      await catSeed();
       for(const e of ev)await FB.set('events',e.id,{cat:til});
       for(const r of rg)await FB.set('regular',r.id,{cat:til});
+      const dok=(await FB.catsList()).find(c=>c.name===navn);if(dok)await FB.delCatDoc(dok.id);
       if(state.filter===navn)state.filter='Alle';
-      await refresh();push('Kategorien er slettet',(ev.length+rg.length)?(ev.length+rg.length)+' oppføring'+((ev.length+rg.length)===1?'':'er')+' flyttet til «'+til+'».':'«'+navn+'» er fjernet.')}
-    catch(er){push('Kunne ikke slette',saveMsg(er&&er.code))}});
+      await refresh();push('Kategorien er slettet',n?n+' oppføring'+(n===1?'':'er')+' flyttet til «'+til+'».':'«'+navn+'» er fjernet.')}
+    catch(er){push('Kunne ikke lagre',saveMsg(er&&er.code)+' (Er de nye reglene publisert i Firebase?)')}});
   dlg.showModal();
 }
 function fastAsk(id,dato){

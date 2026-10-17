@@ -43,6 +43,12 @@ service cloud.firestore {
     // kan koble koden til sin egen e-post (email), og bare sin egen. Gruppene hentes fra brukerens oppføring i members/admins, aldri herfra. Koden er
     // dokument-ID og må ha lengde som en ekte FCM-kode. Å slette krever at man kjenner koden (den er hemmelig for enheten).
     // Bare administratorer kan lese listen eller sette grupper. Dette hindrer ikke at fremmede legger inn søppelkoder.
+    // Kategorier for arrangementer og faste samlinger: alle kan lese, bare administratorer endrer.
+    match /categories/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // Grupper (navn og beskrivelse): alle kan lese, bare administratorer endrer.
     match /groups/{id} {
       allow read: if true;
