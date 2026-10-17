@@ -88,6 +88,10 @@ dialog.lp{border:0;border-radius:18px;padding:20px;max-width:380px;width:calc(10
 dialog.lp::backdrop{background:rgba(5,20,40,.55)}
 dialog.pub{max-height:88vh;overflow:auto;width:min(94vw,440px)}
 .lpzone{min-height:38vh;display:flex;align-items:flex-end;justify-content:center;padding:16px;text-align:center}
+.tag.avl{background:#b3261e;color:#fff}
+.item.avl>button b{text-decoration:line-through;opacity:.75}
+dialog.lp .btns.col{flex-direction:column;align-items:stretch}
+dialog.lp .btns.col .btn{width:100%}
 .btn.danger{background:#b3261e;color:#fff;border-color:#b3261e}
 .detail{padding:0 14px 14px 116px;display:none;flex-direction:column;gap:10px}
 @media (max-width:480px){.detail{padding-left:14px}}
@@ -215,11 +219,21 @@ function drawTabs(){$('#tabs').innerHTML=TABS.map(([k,l,i])=>`<button data-t="${
 function when(d){const diff=Math.round((new Date(d).setHours(0,0,0,0)-new Date(now).setHours(0,0,0,0))/864e5);
   return diff===0?'I dag':diff===1?'I morgen':cap(DAYS[d.getDay()])}
 function dateBox(ev){const d=ev.w,e=ev.e;const m=cap(MON[d.getMonth()]);const s=e&&e.getTime()!==new Date(d).setHours(23,59,0,0)?`${d.getDate()}.${e.getMonth()===d.getMonth()?'-'+e.getDate()+'. '+m:' '+m+'-'+e.getDate()+'. '+cap(MON[e.getMonth()])}`:`${d.getDate()}. ${m}`;const yr=d.getFullYear()!==now.getFullYear()?`<br><span style="font-size:13px;opacity:.8">${d.getFullYear()}</span>`:'';return `<div class="date">${s.replace('.-','.–')}${yr}</div>`}
-function nextFast(){return regular.filter(r=>/^[0-9]{1,2}:[0-9]{2}$/.test(r.time||'')).map(r=>{const [h,mi]=r.time.split(':').map(Number),w=new Date(now);w.setHours(h,mi,0,0);w.setDate(w.getDate()+(r.day-w.getDay()+7)%7);if(w<now)w.setDate(w.getDate()+7);return {fast:r,w}})}
-const fastId=(r,w)=>'f_'+r.id+'_'+w.getFullYear()+'-'+String(w.getMonth()+1).padStart(2,'0')+'-'+String(w.getDate()).padStart(2,'0');
-function fastItem(r,w){const id=fastId(r,w),open=state.open[id],on=state.rsvp[id];
-  return `<div class="item ${open?'open':''}"><button data-ev="${id}" aria-expanded="${!!open}"><div class="date">${w.getDate()}. ${cap(MON[w.getMonth()])}</div><div class="grow"><b>${esc(r.title)}</b><span class="small">${when(w)} kl. ${esc(r.time)}${r.note?' · '+esc(r.note):''}</span></div><span class="tag">Fast</span></button>
-   <div class="detail"><div class="small">Fast samling hver ${DAYS[r.day]}.</div><div class="btns"><button class="btn ${on?'on':''}" data-rsvp="${id}">${on?'✓ Jeg kommer':'Jeg kommer'}</button>${remBtn(id)}</div>${remHint(id)}${cnt(id)}</div></div>`}
+const dkey=w=>w.getFullYear()+'-'+String(w.getMonth()+1).padStart(2,'0')+'-'+String(w.getDate()).padStart(2,'0');
+const hhmm=w=>String(w.getHours()).padStart(2,'0')+':'+String(w.getMinutes()).padStart(2,'0');
+const TIDOK=t=>/^[0-9]{1,2}:[0-9]{2}$/.test(t||'');
+/* Neste forekomst av hver fast samling. Unntak (r.ex[dato]): fjernet = hoppes over, avlyst = vises som avlyst (og neste gang vises også), endret = nytt klokkeslett og/eller merknad. */
+function nextFast(){const out=[];
+  regular.filter(r=>TIDOK(r.time)).forEach(r=>{const [h,mi]=r.time.split(':').map(Number);let w=new Date(now);w.setHours(h,mi,0,0);w.setDate(w.getDate()+(r.day-w.getDay()+7)%7);if(w<now)w.setDate(w.getDate()+7);
+    for(let i=0;i<10;i++){const k=dkey(w),ex=(r.ex||{})[k];
+      if(!ex||ex.k!=='fjernet'){const ww=new Date(w);if(ex&&ex.k==='endret'&&TIDOK(ex.time)){const [h2,m2]=ex.time.split(':').map(Number);ww.setHours(h2,m2,0,0)}
+        out.push({fast:r,w:ww,ex});if(!ex||ex.k!=='avlyst')break}
+      w=new Date(w);w.setDate(w.getDate()+7)}});
+  return out}
+const fastId=(r,w)=>'f_'+r.id+'_'+dkey(w);
+function fastItem(r,w,ex){const id=fastId(r,w),open=state.open[id],on=state.rsvp[id],avl=ex&&ex.k==='avlyst',note=ex&&ex.k==='endret'&&ex.note?ex.note:r.note;
+  return `<div class="item ${open?'open':''} ${avl?'avl':''}"${state.admin&&state.view==='meg'?` data-lp="fast:${r.id}:${dkey(w)}"`:''}><button data-ev="${id}" aria-expanded="${!!open}"><div class="date">${w.getDate()}. ${cap(MON[w.getMonth()])}</div><div class="grow"><b>${esc(r.title)}</b><span class="small">${when(w)} kl. ${hhmm(w)}${note?' · '+esc(note):''}</span></div>${avl?'<span class="tag avl">Avlyst</span>':ex&&ex.k==='endret'?'<span class="tag avl" style="background:var(--lamp);color:#fff">Endret</span>':'<span class="tag">Fast</span>'}</button>
+   <div class="detail"><div class="small">${avl?'Denne gangen er avlyst. ':''}Fast samling hver ${DAYS[r.day]}.</div>${avl?'':`<div class="btns"><button class="btn ${on?'on':''}" data-rsvp="${id}">${on?'✓ Jeg kommer':'Jeg kommer'}</button>${remBtn(id)}</div>${remHint(id)}${cnt(id)}`}</div></div>`}
 function evItem(e){
   if(e.m&&!state.member)return `<div class="item"><div class="locked" style="padding:12px">${dateBox(e)}<div class="grow"><b>${e.t}</b><span class="small">Kun for medlemmer. Logg inn under «Meg».</span></div></div></div>`;
   const open=state.open[e.id],r=state.rsvp[e.id];
@@ -278,7 +292,7 @@ function home(){
    <div class="btns" style="margin-top:12px"><button class="btn" style="color:var(--ink)" data-rsvp="${n.id}" data-stay="1">${state.rsvp[n.id]?'✓ Jeg kommer':'Jeg kommer'}</button></div>${counts[n.id]>0?`<div class="meta" style="margin-top:8px">${counts[n.id]} kommer</div>`:''}</div>`
   :`<div class="card next"><div class="eyebrow">Neste samling</div><h2>Ingen planlagt</h2><div class="meta">Se faste samlinger under Program.</div></div>`}
   ${post?`<div class="alert"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></div><div><span class="eyebrow">Viktig</span><b>${esc(post.t)}</b><span class="small">${esc(post.b)}</span></div></div>`:''}
-  ${wk.length?`<div><h2 style="margin-bottom:10px">Kommer snart</h2><div class="list">${wk.map(x=>x.ev?evItem(x.ev):fastItem(x.fast,x.w)).join('')}</div></div>`:''}
+  ${wk.length?`<div><h2 style="margin-bottom:10px">Kommer snart</h2><div class="list">${wk.map(x=>x.ev?evItem(x.ev):fastItem(x.fast,x.w,x.ex)).join('')}</div></div>`:''}
   ${svCard()}
   <div class="card"><h2>Finn frem</h2><p class="small" style="margin:6px 0 0">Adresse: Kometvegen 7, 6419 Molde<br>Kontortid: tirsdag–torsdag kl. 10–16<br>Telefon: <a href="tel:+4771251029">71 25 10 29</a><br>E-post: <a href="mailto:post@sionmolde.no">post@sionmolde.no</a></p></div>`}
 
@@ -287,8 +301,10 @@ function prog(){
   const list=[...events.filter(e=>state.filter==='Alle'||normCat(e.cat)===state.filter).map(e=>({ev:e,w:e.w})),...nextFast().filter(f=>state.filter==='Alle'||normCat(f.fast.cat)===state.filter)].sort((a,b)=>a.w-b.w);
   let last='',out='';
   list.forEach(x=>{const e=x.ev||{w:x.w};const k=when(e.w)+' '+e.w.getDate()+'. '+MON[e.w.getMonth()]+(e.w.getFullYear()!==now.getFullYear()?' '+e.w.getFullYear():'');
-    if(k!==last){out+=`<div class="day">${k}</div>`;last=k}out+=x.ev?evItem(x.ev):fastItem(x.fast,x.w)});
+    if(k!==last){out+=`<div class="day">${k}</div>`;last=k}out+=x.ev?evItem(x.ev):fastItem(x.fast,x.w,x.ex)});
+  const kanLp=state.admin&&state.view==='meg';
   return `<div class="hd"><h1>Kommende arrangementer</h1><span class="script">sett av datoene!</span></div><div class="chips">${cats.map(c=>`<button class="chip" data-f="${c}" aria-pressed="${state.filter===c}">${c}</button>`).join('')}</div>
+  ${kanLp?'<p class="small" style="margin:0 0 8px">Hold inne på et arrangement eller en fast samling for å endre eller slette.</p>':''}
   <div class="list">${out||'<p class="small">Ingen oppføringer her ennå.</p>'}</div>`}
 
 function regList(){
@@ -733,7 +749,7 @@ let lpT=null,lpX=0,lpY=0,lpFired=false;
 document.addEventListener('pointerdown',e=>{lpFired=false;clearTimeout(lpT);
   if(state.tab==='news'&&state.view==='meg'&&(state.admin||isLeader())&&e.target.closest('#view')&&!e.target.closest('[data-lp],button,a,input,select,textarea,label,summary')){lpX=e.clientX;lpY=e.clientY;lpT=setTimeout(()=>{lpT=null;lpFired=true;pubAsk()},650);return}
   if(!state.admin||state.view!=='meg')return;const t=e.target.closest('[data-lp]');if(!t)return;lpX=e.clientX;lpY=e.clientY;lpT=setTimeout(()=>{lpT=null;lpFired=true;lpAsk(t.dataset.lp)},650)});
-['pointerup','pointercancel'].forEach(n=>document.addEventListener(n,()=>{clearTimeout(lpT);setTimeout(()=>{lpFired=false},400)}));
+['pointerup','pointercancel'].forEach(n=>document.addEventListener(n,()=>{clearTimeout(lpT);setTimeout(()=>{lpFired=false},150)}));
 document.addEventListener('pointermove',e=>{if(lpT&&Math.hypot(e.clientX-lpX,e.clientY-lpY)>10)clearTimeout(lpT)});
 document.addEventListener('contextmenu',e=>{if((state.admin&&e.target.closest('[data-lp]'))||(state.tab==='news'&&e.target.closest('#view .lpzone, #view h1')))e.preventDefault()});
 document.addEventListener('click',e=>{if(lpFired){lpFired=false;e.stopPropagation();e.preventDefault()}},true);
@@ -748,8 +764,43 @@ function pubAsk(){
   dlg.addEventListener('close',()=>{clearInterval(iv);dlg.remove();state.msg=''});
   dlg.showModal();
 }
+function fastAsk(id,dato){
+  const r=regular.find(x=>x.id===id);if(!r||!FB)return;
+  const ex=(r.ex||{})[dato]||null,d=new Date(dato+'T'+r.time),dn=cap(DAYS[d.getDay()])+' '+d.getDate()+'. '+MON[d.getMonth()],dlg=document.createElement('dialog');dlg.className='lp';
+  const stat=ex?(ex.k==='avlyst'?'Avlyst denne gangen.':ex.k==='endret'?'Endret denne gangen'+(ex.time?': kl. '+ex.time:'')+(ex.note?' · '+ex.note:'')+'.':''):'';
+  dlg.innerHTML='<form class="form" method="dialog" onkeydown="if(event.key===\'Enter\'&&event.target.tagName===\'INPUT\')event.preventDefault()"><h3 style="margin:0">'+esc(r.title)+'</h3><p class="small" style="margin:0">'+esc(dn)+' kl. '+esc(r.time)+(stat?'<br><b>'+esc(stat)+'</b>':'')+'</p>'
+   +(PUSH_URL?'<label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="lpPush" style="width:22px;height:22px;flex:none">Send varsel til alle (gjelder avlys og endre)</label>':'')
+   +'<div class="btns col">'+(ex&&ex.k!=='fjernet'?'<button class="btn" value="angre">Angre ('+(ex.k==='avlyst'?'avlysning':'endring')+')</button>':'')+(ex&&ex.k==='avlyst'?'':'<button class="btn" value="avlys">Merk denne gangen som avlyst</button>')+'<button class="btn" value="fjern">Fjern bare denne gangen</button></div>'
+   +'<details><summary style="cursor:pointer;font-weight:600">Endre denne gangen</summary><div style="display:grid;gap:8px;margin-top:8px"><label class="f">Nytt klokkeslett<input id="lpTime" type="time"></label><label class="f">Ny merknad<input id="lpNote" type="text" maxlength="100"></label><button class="btn" value="endre">Lagre endringen</button></div></details>'
+   +'<div class="btns col"><button class="btn" value="rediger">Endre hele den faste samlingen</button><button class="btn danger" value="slettalle">Slett hele den faste samlingen</button><button class="btn" value="avbryt">Avbryt</button></div></form>';
+  document.body.appendChild(dlg);
+  dlg.addEventListener('close',async()=>{
+    const rv=dlg.returnValue,send=!!(dlg.querySelector('#lpPush')&&dlg.querySelector('#lpPush').checked),time=dlg.querySelector('#lpTime').value.trim(),note=dlg.querySelector('#lpNote').value.trim();dlg.remove();
+    try{
+      if(rv==='rediger'){state.adm={type:'regular',edit:id,form:true};state.tab='me';state.acc.adm=true;state.msg='';render();setTimeout(()=>{const f=$('#adm');if(f)f.scrollIntoView({block:'start'})},80);return}
+      if(rv==='slettalle'){
+        if(!confirm('Slette hele den faste samlingen «'+r.title+'»? Alle kommende ganger forsvinner.'))return;
+        try{await FB.ensureSnapshot('Før sletting',5*60e3)}catch(er){if(!confirm('Kunne ikke lage et sikkerhetspunkt før sletting ('+((er&&er.code)||'feil')+'). Slette likevel?'))return}
+        await FB.del('regular',id);await refresh();push('Slettet','«'+r.title+'» er fjernet.');return}
+      const nx={...(r.ex||{})};
+      if(rv==='avlys')nx[dato]={k:'avlyst'};
+      else if(rv==='angre')delete nx[dato];
+      else if(rv==='fjern')nx[dato]={k:'fjernet'};
+      else if(rv==='endre'){if(!TIDOK(time)&&!note){push('Fyll ut','Skriv nytt klokkeslett eller en merknad.');return}nx[dato]={k:'endret',...(TIDOK(time)?{time}:{}),...(note?{note}:{})}}
+      else return;
+      await FB.setFastEx(id,nx);
+      let tillegg='';
+      if(send&&PUSH_URL&&(rv==='avlys'||rv==='endre')){
+        const tittel=(rv==='avlys'?'Avlyst: ':'Endret: ')+r.title,body=rv==='avlys'?dn+' kl. '+r.time+' er avlyst.':dn+(TIDOK(time)?', nå kl. '+time:'')+(note?'. '+note:'');
+        try{const res=await FB.sendPush(PUSH_URL,tittel,body,'prog',{type:'alle'});tillegg=res.ok?' Varsel sendt til '+res.sendt+' enheter.':' Varsel ikke sendt: '+res.feil}catch(x){tillegg=' Varsel kunne ikke sendes.'}}
+      await refresh();
+      push(rv==='avlys'?'Merket som avlyst':rv==='fjern'?'Fjernet denne gangen':rv==='endre'?'Endret':'Angret',(dn+'.')+tillegg)
+    }catch(er){push('Kunne ikke lagre',saveMsg(er&&er.code))}});
+  dlg.showModal();
+}
 function lpAsk(key){
-  const [col,id]=key.split(':'),x=(col==='posts'?posts:rawEvents).find(a=>String(a.id)===id);if(!x||!FB)return;
+  const [col,id,dato]=key.split(':');if(col==='fast')return fastAsk(id,dato);
+  const x=(col==='posts'?posts:rawEvents).find(a=>String(a.id)===id);if(!x||!FB)return;
   const tittel=col==='posts'?x.t:x.title,dlg=document.createElement('dialog');dlg.className='lp';
   dlg.innerHTML='<form class="form" method="dialog"><h3 style="margin:0">Slette «'+esc(tittel)+'»?</h3><p class="small" style="margin:0">'+(col==='posts'?'Nyheten':'Arrangementet')+' fjernes for alle. Du kan rulle tilbake under Meg → Sikkerhetskopi og tilbakerulling.</p><div class="btns"><button class="btn danger" value="slett">Slett</button><button class="btn" value="avbryt">Avbryt</button></div></form>';
   document.body.appendChild(dlg);

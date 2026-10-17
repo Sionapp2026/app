@@ -40,6 +40,8 @@ try{
     },
     add:(col,data)=>S.addDoc(S.collection(db,col),{...data,created:S.serverTimestamp()}),
     set:(col,id,data)=>S.setDoc(S.doc(db,col,id),data,{merge:true}),
+    // Unntak for enkeltdatoer på en fast samling (avlyst / fjernet / endret). Hele ex-feltet byttes ut.
+    setFastEx:(id,ex)=>S.updateDoc(S.doc(db,'regular',id),{ex}),
     del:(col,id)=>S.deleteDoc(S.doc(db,col,id)),
     // «Jeg kommer»: en anonym teller per arrangement. Ingen navn lagres, bare antallet.
     async counts(){const snap=await S.getDocs(S.collection(db,'rsvpCounts'));const o={};snap.docs.forEach(d=>o[d.id]=d.data().n||0);return o},
