@@ -393,12 +393,17 @@ const fmtTid=ms=>{const d=new Date(ms),p=n=>String(n).padStart(2,'0');return d.g
 const tellTxt=c=>(c.events||0)+' arrangementer · '+(c.posts||0)+' nyheter · '+(c.regular||0)+' faste samlinger · '+((c.members||0)+(c.admins||0))+' brukere';
 function snapCard(){
   const l=state.snaps;
-  return `<details class="card acc" data-acc="tilbake" ${state.acc.tilbake?'open':''}><summary><h3>Rull tilbake (sikkerhetspunkter)</h3></summary>
+  return `<details class="card acc" data-acc="tilbake" ${state.acc.tilbake?'open':''}><summary><h3>Sikkerhetskopi og tilbakerulling</h3></summary>
+  <h3 style="margin:0 0 4px;font-size:18px">Last ned en kopi</h3>
+  <p class="small" style="margin:0 0 8px">Laster ned en fil med alle arrangementer, nyheter, faste samlinger, brukerlister og tellere. Filen inneholder e-postadresser til brukerne, så oppbevar den trygt og del den ikke utenfor administratorene. Ta en kopi av og til.</p>
+  <button class="btn" data-backup>Last ned sikkerhetskopi</button>
+  <p class="small" role="status" style="margin:8px 0 0">${esc(state.backupMsg)}</p>
+  <h3 style="margin:18px 0 4px;font-size:18px">Rull tilbake</h3>
   <p class="small" style="margin:0 0 10px">Hvis noe er slettet ved et uhell, kan du rulle arrangementer, nyheter, faste samlinger og brukerlister tilbake til et tidligere punkt. Appen lager automatisk et punkt første gang en administrator åpner appen hver dag, og før noe slettes. De 30 nyeste beholdes.</p>
   <button class="btn" data-snapnow>Lag sikkerhetspunkt nå</button>
   <p class="small" role="status" style="margin:8px 0">${esc(state.snapMsg)}</p>
   <div class="reg">${l===null?'<p class="small">Henter sikkerhetspunkter ...</p>':l.length?l.map(x=>`<div class="r" style="flex-wrap:wrap"><div class="grow" style="min-width:60%"><b>${esc(fmtTid(x.ms))}</b><span class="small">${esc(x.label||'')}${x.by?' · '+esc(x.by):''}<br>${esc(tellTxt(x.counts||{}))}</span></div><button class="btn" data-snaprestore="${esc(x.id)}">Rull tilbake</button></div>`).join(''):'<p class="small">Ingen sikkerhetspunkter ennå. Trykk «Lag sikkerhetspunkt nå».</p>'}</div>
-  <h3 style="margin:16px 0 4px;font-size:18px">Gjenopprett fra fil</h3>
+  <h3 style="margin:18px 0 4px;font-size:18px">Gjenopprett fra fil</h3>
   <p class="small" style="margin:0 0 8px">Brukes hvis sikkerhetspunktene også er borte. Velg en fil du har lastet ned med «Last ned sikkerhetskopi».</p>
   <input type="file" id="restoreFile" accept=".json,application/json" style="margin-bottom:8px">
   <button class="btn" data-filerestore>Gjenopprett fra fil</button></details>`}
@@ -424,7 +429,7 @@ function me(){
   ${pushCard()}
   ${state.user?`<details class="card acc" data-acc="flere" ${state.acc.flere?'open':''}><summary><h2>Medlem i flere menigheter?</h2></summary><p class="small" style="margin:0">Mange medlemmer står registrert i andre menigheter enn Sion, og da mister vi statsstøtten for dem. <a href="https://person.brreg.no/nb/minside/tros-og-livssyn" target="_blank" rel="noopener">Sjekk her om du er medlem andre steder</a>. Takk for hjelpen!</p></details>`:''}
 
-  ${state.admin?admin()+pushAdmin()+memberCard()+backupCard()+snapCard():isLeader()?admin()+pushAdmin():''}`}
+  ${state.admin?admin()+pushAdmin()+memberCard()+snapCard():isLeader()?admin()+pushAdmin():''}`}
 
 const VIEWS={home,prog,news,me};
 const SUN='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
