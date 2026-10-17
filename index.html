@@ -210,7 +210,7 @@ function nextFast(){return regular.filter(r=>/^[0-9]{1,2}:[0-9]{2}$/.test(r.time
 const fastId=(r,w)=>'f_'+r.id+'_'+w.getFullYear()+'-'+String(w.getMonth()+1).padStart(2,'0')+'-'+String(w.getDate()).padStart(2,'0');
 function fastItem(r,w){const id=fastId(r,w),open=state.open[id],on=state.rsvp[id];
   return `<div class="item ${open?'open':''}"><button data-ev="${id}" aria-expanded="${!!open}"><div class="date">${w.getDate()}. ${cap(MON[w.getMonth()])}</div><div class="grow"><b>${esc(r.title)}</b><span class="small">${when(w)} kl. ${esc(r.time)}${r.note?' · '+esc(r.note):''}</span></div><span class="tag">Fast</span></button>
-   <div class="detail"><div class="small">Fast samling hver ${DAYS[r.day]}.</div><div class="btns"><button class="btn ${on?'on':''}" data-rsvp="${id}">${on?'✓ Jeg kommer':'Jeg kommer'}</button></div>${cnt(id)}</div></div>`}
+   <div class="detail"><div class="small">Fast samling hver ${DAYS[r.day]}.</div><div class="btns"><button class="btn ${on?'on':''}" data-rsvp="${id}">${on?'✓ Jeg kommer':'Jeg kommer'}</button></div>${remBtns(id)}${cnt(id)}</div></div>`}
 function evItem(e){
   if(e.m&&!state.member)return `<div class="item"><div class="locked" style="padding:12px">${dateBox(e)}<div class="grow"><b>${e.t}</b><span class="small">Kun for medlemmer. Logg inn under «Meg».</span></div></div></div>`;
   const open=state.open[e.id],r=state.rsvp[e.id];
@@ -219,7 +219,7 @@ function evItem(e){
    ${e.m?'<span class="tag m">Medlem</span>':`<span class="tag">${esc(normCat(e.cat))}</span>`}</button>
    <div class="detail"><div>${e.d}</div><div class="small">${esc(e.who)}</div>
    <div class="btns"><button class="btn ${r?'on':''}" data-rsvp="${e.id}">${r?'✓ Jeg kommer':'Jeg kommer'}</button>
-   </div>${cnt(e.id)}</div></div>`}
+   </div>${remBtns(e.id)}${cnt(e.id)}</div></div>`}
 
 /* Påmeldingen går til Google Skjema «Sommerstevne påmeldinger nyhetsbrev». Svarene havner i et regneark i Drive,
    og scriptet i regnearket sender e-postvarsel. Google svarer ikke tilbake til nettsider, så vi kan ikke se om det lyktes. */
@@ -233,7 +233,11 @@ const RS={arr:'entry.568243152',dato:'entry.1403655940',navn:'entry.1951632759',
 const lsGet=k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 let rsPending=null;
-function rsEv(id){const f=String(id).match(/^f_(.+)_([0-9]{4}-[0-9]{2}-[0-9]{2})$/);if(!f)return events.find(x=>x.id==id);const r=regular.find(x=>x.id==f[1]);return r?{id,title:r.title+' (fast samling)',start:f[2]}:null}
+function rsEv(id){const f=String(id).match(/^f_(.+)_([0-9]{4}-[0-9]{2}-[0-9]{2})$/);if(!f)return events.find(x=>x.id==id);const r=regular.find(x=>x.id==f[1]);return r?{id,title:r.title+' (fast samling)',start:f[2],time:r.time}:null}
+// Tidspunkt (ms) for påminnelsen: 'h' = 1 time før, 'd' = kl. 18 dagen før. Samlinger uten klokkeslett regnes som kl. 09.
+function remAt(ev,lead){const t=new Date(ev.start+'T'+(ev.time||'09:00'));return lead==='h'?t.getTime()-36e5:new Date(t.getFullYear(),t.getMonth(),t.getDate()-1,18,0).getTime()}
+const remId=id=>(lsGet('sm-push').slice(-24)+'_'+id).replace(/[^A-Za-z0-9_-]/g,'');
+function remBtns(id){const v=state.rem[id];return `<div class="btns"><button class="btn ${v==='h'?'on':''}" data-rem="${id}" data-lead="h">${v==='h'?'✓ Varsler 1 time før':'Minn meg på: 1 time før'}</button><button class="btn ${v==='d'?'on':''}" data-rem="${id}" data-lead="d">${v==='d'?'✓ Varsler dagen før':'Minn meg på: dagen før'}</button></div>`}
 function openRsvp(id){
   const ev=rsEv(id);if(!ev)return;
   rsPending=id;$('#rsT').textContent='Jeg kommer: '+ev.title;
@@ -479,6 +483,19 @@ document.addEventListener('click',async e=>{
   else if(c.dataset.ev){keep(()=>state.open[c.dataset.ev]=!state.open[c.dataset.ev])}
   else if(c.dataset.rsvp){
     if(state.rsvp[c.dataset.rsvp])await setRsvp(c.dataset.rsvp,false);else openRsvp(c.dataset.rsvp)}
+  else if(c.dataset.rem){
+    const id=c.dataset.rem,lead=c.dataset.lead,ev=rsEv(id);if(!ev||!FB)return;
+    try{
+      if(state.rem[id]===lead){await FB.delReminder(remId(id));keep(()=>{delete state.rem[id];save()});push('Påminnelsen er fjernet','');return}
+      if(!lsGet('sm-push')){
+        const reg=await Promise.race([navigator.serviceWorker.ready,new Promise((_,no)=>setTimeout(()=>no({code:'push/no-sw'}),6000))]);
+        lsSet('sm-push',await FB.enablePush(reg))}
+      const at=remAt(ev,lead);
+      if(at<Date.now()){push('For sent','Tidspunktet for denne påminnelsen har passert.');return}
+      if(state.rem[id])await FB.delReminder(remId(id)).catch(()=>{});
+      await FB.setReminder(remId(id),{token:lsGet('sm-push'),title:ev.title,fireAt:at});
+      keep(()=>{state.rem[id]=lead;save()});push('Påminnelse satt',lead==='h'?'Du får et varsel 1 time før.':'Du får et varsel kl. 18 dagen før.')}
+    catch(er){push('Kunne ikke sette påminnelse',er&&er.code==='push/denied'?'Du har sagt nei til varsler. Slå dem på i innstillingene.':er&&er.code==='push/unsupported'?'Varsler støttes ikke her. På iPhone må appen ligge på hjemskjermen.':'Slå på varsler under Meg, og prøv igjen.')}}
   else if('rscancel' in c.dataset){$('#rsDlg').close();rsPending=null}
   else if(c.dataset.af){state.af=c.dataset.af;state.sel={};keep(()=>{})}
   else if(c.dataset.f){state.filter=c.dataset.f;keep(()=>{})}

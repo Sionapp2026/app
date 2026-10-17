@@ -65,6 +65,9 @@ try{
       return token;
     },
     // Kobler en eksisterende varselkode til innlogget bruker (etter innlogging), eller fjerner koblingen (før utlogging).
+    // Påminnelser: ett dokument per enhet og samling. Apps Script sender varselet når fireAt er passert og sletter dokumentet.
+    setReminder:(id,d)=>S.setDoc(S.doc(db,'reminders',id),{...d,created:S.serverTimestamp()}),
+    delReminder:id=>S.deleteDoc(S.doc(db,'reminders',id)),
     linkPush:token=>auth.currentUser?S.setDoc(S.doc(db,'pushTokens',token),{token,groups:[],created:S.serverTimestamp(),email:auth.currentUser.email.toLowerCase()}):Promise.resolve(),
     unlinkPush:token=>S.setDoc(S.doc(db,'pushTokens',token),{token,groups:[],created:S.serverTimestamp()}),
     // Feiler høyt: kalleren beholder status og viser feil hvis abonnementet ikke faktisk ble fjernet.

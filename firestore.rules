@@ -43,6 +43,17 @@ service cloud.firestore {
     // kan koble koden til sin egen e-post (email), og bare sin egen. Gruppene hentes fra brukerens oppføring i members/admins, aldri herfra. Koden er
     // dokument-ID og må ha lengde som en ekte FCM-kode. Å slette krever at man kjenner koden (den er hemmelig for enheten).
     // Bare administratorer kan lese listen eller sette grupper. Dette hindrer ikke at fremmede legger inn søppelkoder.
+    // Påminnelser før samlinger. Alle kan opprette og slette (id-en inneholder en del av varselkoden); bare administratorer/scriptet leser.
+    match /reminders/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['token', 'title', 'fireAt', 'created'])
+        && request.resource.data.token is string && request.resource.data.token.size() >= 100 && request.resource.data.token.size() <= 500
+        && request.resource.data.title is string && request.resource.data.title.size() <= 200
+        && request.resource.data.fireAt is int
+        && request.resource.data.created == request.time;
+      allow delete: if true;
+      allow read, update: if isAdmin();
+    }
+
     match /pushTokens/{token} {
       allow create, update: if request.resource.data.keys().hasOnly(['token', 'groups', 'created', 'email'])
         && request.resource.data.token == token
