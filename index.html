@@ -86,6 +86,8 @@ h3{font-size:22px;line-height:1.1}
 [data-lp]{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 dialog.lp{border:0;border-radius:18px;padding:20px;max-width:380px;width:calc(100% - 32px);background:var(--surface);color:var(--ink);box-shadow:0 20px 60px rgba(0,0,0,.4)}
 dialog.lp::backdrop{background:rgba(5,20,40,.55)}
+dialog.pub{max-height:88vh;overflow:auto;width:min(94vw,440px)}
+.lpzone{min-height:38vh;display:flex;align-items:flex-end;justify-content:center;padding:16px;text-align:center}
 .btn.danger{background:#b3261e;color:#fff;border-color:#b3261e}
 .detail{padding:0 14px 14px 116px;display:none;flex-direction:column;gap:10px}
 @media (max-width:480px){.detail{padding-left:14px}}
@@ -298,7 +300,8 @@ function news(){
   const l=posts.map(p=>{
    if(p.m&&!state.member)return `<div class="card locked"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><div><b style="color:var(--ink)">${esc(p.t)}</b><div class="small">Logg inn som medlem for å lese.</div></div></div>`;
    return `<div class="card post"${state.admin?` data-lp="posts:${p.id}"`:''}><div class="head">${isNew(p)?'<span class="dot" title="Ulest"></span>':''}${postTags(p)}<span class="small">${esc(ago(p))}</span></div><h3>${esc(p.t)}</h3><div class="small" style="color:var(--ink)">${esc(p.b)}</div></div>`}).join('');
-  return `<h1>Nyheter</h1><div class="list">${l||'<p class="small">Ingen nyheter ennå.</p>'}</div>`}
+  const kan=state.admin||isLeader();
+  return `<h1>Nyheter</h1><div class="list">${l||'<p class="small">Ingen nyheter ennå.</p>'}</div>${kan?'<div class="lpzone"><span class="small">Hold inne på en tom plass på siden for å publisere en nyhet.</span></div>':''}`}
 
 /* ---------- Innlogging og administrasjon ---------- */
 const CATS=['Møte','Samling','Ledersamling','Menighetsmøte','Happeninger','Ungdom'];
@@ -702,6 +705,7 @@ document.addEventListener('submit',async e=>{
     try{
       if(state.adm.edit)await FB.set(COL[t],state.adm.edit,d);else await FB.add(COL[t],d);
       state.msg='Lagret.';state.adm.edit=null;state.adm.form=false;usingFb=true;
+      {const pd=document.querySelector('dialog.pub');if(pd){pd.close();push('Publisert','Nyheten er lagt ut.')}}
       if(wantPush&&!isEdit){
         const mal=d.groups&&d.groups.length?{type:'grupper',groups:d.groups}:d.m?{type:'medlem'}:{type:'alle'};
         try{const r=await FB.sendPush(PUSH_URL,d.t,String(d.b||'').slice(0,140),'news',mal);state.msg='Lagret. '+(r.ok?'Varsel sendt til '+r.sendt+' av '+r.enheter+' enheter ('+malTekst(mal)+').':'Varsel ikke sendt: '+r.feil)}catch(x){state.msg='Lagret. Varsel kunne ikke sendes (ingen kontakt med varseltjenesten).'}
@@ -712,11 +716,24 @@ document.addEventListener('submit',async e=>{
 
 /* Administrator: hold inne på en nyhet eller et arrangement for å få opp «Slett». */
 let lpT=null,lpX=0,lpY=0,lpFired=false;
-document.addEventListener('pointerdown',e=>{if(!state.admin)return;const t=e.target.closest('[data-lp]');lpFired=false;clearTimeout(lpT);if(!t)return;lpX=e.clientX;lpY=e.clientY;lpT=setTimeout(()=>{lpT=null;lpFired=true;lpAsk(t.dataset.lp)},650)});
+document.addEventListener('pointerdown',e=>{lpFired=false;clearTimeout(lpT);
+  if(state.tab==='news'&&(state.admin||isLeader())&&e.target.closest('#view')&&!e.target.closest('[data-lp],button,a,input,select,textarea,label,summary')){lpX=e.clientX;lpY=e.clientY;lpT=setTimeout(()=>{lpT=null;lpFired=true;pubAsk()},650);return}
+  if(!state.admin)return;const t=e.target.closest('[data-lp]');if(!t)return;lpX=e.clientX;lpY=e.clientY;lpT=setTimeout(()=>{lpT=null;lpFired=true;lpAsk(t.dataset.lp)},650)});
 ['pointerup','pointercancel'].forEach(n=>document.addEventListener(n,()=>{clearTimeout(lpT);setTimeout(()=>{lpFired=false},400)}));
 document.addEventListener('pointermove',e=>{if(lpT&&Math.hypot(e.clientX-lpX,e.clientY-lpY)>10)clearTimeout(lpT)});
-document.addEventListener('contextmenu',e=>{if(state.admin&&e.target.closest('[data-lp]'))e.preventDefault()});
+document.addEventListener('contextmenu',e=>{if((state.admin&&e.target.closest('[data-lp]'))||(state.tab==='news'&&e.target.closest('#view .lpzone, #view h1')))e.preventDefault()});
 document.addEventListener('click',e=>{if(lpFired){lpFired=false;e.stopPropagation();e.preventDefault()}},true);
+function pubAsk(){
+  if(document.querySelector('dialog.pub'))return;
+  state.adm={type:'posts',edit:null,form:false};state.msg='';
+  const dlg=document.createElement('dialog');dlg.className='lp pub';
+  dlg.innerHTML='<h3 style="margin:0 0 10px">Ny nyhet</h3><form class="form" id="adm" data-type="posts">'+fields('posts',null)+'<div class="btns"><button class="btn primary" type="submit" style="width:auto">Send melding</button><button class="btn" type="button" data-pubclose>Avbryt</button></div></form><p class="small" role="status" id="pubMsg" style="margin:8px 0 0"></p>';
+  document.body.appendChild(dlg);
+  const iv=setInterval(()=>{const m=$('#pubMsg');if(m)m.textContent=state.msg},300);
+  dlg.addEventListener('click',e=>{if(e.target.closest('[data-pubclose]'))dlg.close()});
+  dlg.addEventListener('close',()=>{clearInterval(iv);dlg.remove();state.msg=''});
+  dlg.showModal();
+}
 function lpAsk(key){
   const [col,id]=key.split(':'),x=(col==='posts'?posts:rawEvents).find(a=>String(a.id)===id);if(!x||!FB)return;
   const tittel=col==='posts'?x.t:x.title,dlg=document.createElement('dialog');dlg.className='lp';
