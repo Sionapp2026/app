@@ -67,8 +67,8 @@ h3{font-size:22px;line-height:1.1}
 .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;font-weight:600;color:var(--muted)}
 .next h2{font-size:34px;margin:4px 0 6px}
 .next .meta{opacity:.9;font-size:15px}
-.alert{border-left:4px solid var(--lamp);background:var(--lamp-soft);border-radius:4px 14px 14px 4px;padding:12px 14px}
-.alert b{display:block}
+.alert{border-left:6px solid var(--lamp);background:var(--lamp-soft);border-radius:6px 16px 16px 6px;padding:14px 16px;box-shadow:0 4px 14px rgba(0,0,0,.12)}
+.alert b{display:block;font-size:18px;margin-bottom:2px}
 .row{display:flex;gap:12px;align-items:center;min-width:0}
 .date{flex:none;width:92px;text-align:center;border-radius:10px;background:var(--chip);padding:12px 4px;line-height:1.1;font-weight:500;font-size:15px;white-space:nowrap}
 .grow{flex:1;min-width:0}
@@ -112,12 +112,11 @@ nav.tabs{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;
 nav.tabs button{border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;font-size:12px;font-weight:600;color:var(--muted);border-radius:10px}
 nav.tabs button[aria-current="page"]{color:var(--brand)}
 nav.tabs svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-#push{position:fixed;top:calc(10px + env(safe-area-inset-top,0px));left:50%;transform:translate(-50%,-140%);width:calc(100% - 24px);max-width:416px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.25);z-index:20;transition:transform .35s;display:flex;gap:10px;align-items:flex-start}
+#push{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translate(-50%,-160%);width:calc(100% - 24px);max-width:440px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-left:6px solid var(--lamp);border-radius:8px 18px 18px 8px;padding:16px 18px;box-shadow:0 14px 40px rgba(0,0,0,.35),0 2px 8px rgba(0,0,0,.2);z-index:20;transition:transform .4s cubic-bezier(.2,.9,.3,1.2);display:flex;gap:14px;align-items:center;cursor:pointer}
 #push.show{transform:translate(-50%,0)}
-#push .logo-mark{width:26px;height:32px}
-#push b{display:block;font-size:14px}
-#push span{font-size:14px;color:var(--muted)}
-.theme{border:0;background:none;color:var(--muted);font-size:13px;text-decoration:underline;align-self:center}
+#push .logo-mark{width:34px;height:42px;flex:none}
+#push b{display:block;font-size:17px;line-height:1.25}
+#push span{display:block;font-size:15px;color:var(--ink);opacity:.85;margin-top:2px}
 @media (prefers-reduced-motion:reduce){#push,.tg,.tg::after{transition:none}}
 </style></head><body>
 
@@ -471,7 +470,8 @@ function badge(){
 const viewBanner=()=>'';
 function render(){drawTabs();$('#view').innerHTML=viewBanner()+VIEWS[state.tab]();badge();window.scrollTo(0,0)}
 let pt;
-function push(t,b){$('#pushT').textContent=t;$('#pushB').textContent=b;$('#push').classList.add('show');clearTimeout(pt);pt=setTimeout(()=>$('#push').classList.remove('show'),4500)}
+function push(t,b){$('#pushT').textContent=t;$('#pushB').textContent=b;$('#push').classList.add('show');clearTimeout(pt);pt=setTimeout(()=>$('#push').classList.remove('show'),7000)}
+$('#push').addEventListener('click',()=>$('#push').classList.remove('show'));
 function keep(fn){const y=scrollY;fn();$('#view').innerHTML=viewBanner()+VIEWS[state.tab]();drawTabs();badge();window.scrollTo(0,y)}
 async function refresh(){await load();keep(()=>{})}
 const authMsg=c=>({'auth/invalid-credential':'Feil e-post eller passord.','auth/invalid-email':'Ugyldig e-postadresse.','auth/user-disabled':'Brukeren er sperret.','auth/too-many-requests':'For mange forsøk. Vent litt og prøv igjen.','auth/network-request-failed':'Ingen nettforbindelse.','auth/weak-password':'Passordet er for svakt. Bruk minst 8 tegn.','auth/requires-recent-login':'Logg ut og inn igjen, og prøv på nytt.'}[c]||'Noe gikk galt. Prøv igjen.');
