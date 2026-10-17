@@ -205,7 +205,7 @@ function ago(p){
 const cnt=id=>counts[id]>0?`<div class="small">${counts[id]} kommer</div>`:'';
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',leder:false,memELd:'',memEA:'',memEL:'',memEM:'',memGL:[],memGM:[],snaps:null,snapMsg:'',view:'meg',edit:true,real:null,vl:['activ8'],af:'Alle',acc:{},sel:{},groups:[],leads:[],ulOpen:'',psMal:'alle',psGr:[],ugOpen:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',leder:false,memELd:'',memEA:'',memEL:'',memEM:'',memGL:[],memGM:[],snaps:null,snapMsg:'',view:'meg',q:'',edit:true,real:null,vl:['activ8'],af:'Alle',acc:{},sel:{},groups:[],leads:[],ulOpen:'',psMal:'alle',psGr:[],ugOpen:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
 state.member=false;state.admin=false;state.user=null;try{state.edit=localStorage.getItem('sm-edit')!=='0'}catch(e){state.edit=true}
 {const dt=new URLSearchParams(location.search).get('tab');if(['home','prog','news','me'].includes(dt)){state.tab=dt;try{history.replaceState(null,'',location.pathname)}catch(e){}}}
@@ -301,17 +301,31 @@ function home(){
   ${svCard()}
   <div class="card"><h2>Finn frem</h2><p class="small" style="margin:6px 0 0">Adresse: Kometvegen 7, 6419 Molde<br>Kontortid: tirsdag–torsdag kl. 10–16<br>Telefon: <a href="tel:+4771251029">71 25 10 29</a><br>E-post: <a href="mailto:post@sionmolde.no">post@sionmolde.no</a></p></div>`}
 
-function prog(){
-  const cats=['Alle',...allCats().filter(canSeeCat)];
-  const list=[...events.filter(e=>state.filter==='Alle'||normCat(e.cat)===state.filter).map(e=>({ev:e,w:e.w})),...nextFast().filter(f=>state.filter==='Alle'||normCat(f.fast.cat)===state.filter)].sort((a,b)=>a.w-b.w);
+/* Søk i Program: tittel, sted, taler, beskrivelse, merknad, kategori og ukedag/dato. Låste arrangementer søkes bare på tittel. */
+const norm=t=>String(t||'').toLowerCase();
+function progMatch(x,q){
+  if(!q)return true;
+  const ord=norm(q).split(/\s+/).filter(Boolean);
+  let hay;
+  if(x.ev){const e=x.ev;hay=(e.m&&!state.member)?norm(e.title):norm([e.title,e.place,e.who,e.text,e.cat,e.start,DAYS[e.w.getDay()],MON[e.w.getMonth()]].join(' '))}
+  else{const r=x.fast;hay=norm([r.title,r.note,r.cat,DAYS[r.day],'fast',x.w.getDate()+'. '+MON[x.w.getMonth()]].join(' '))}
+  return ord.every(o=>hay.includes(o))}
+function progList(){
+  const q=(state.q||'').trim();
+  const list=[...events.filter(e=>state.filter==='Alle'||normCat(e.cat)===state.filter).map(e=>({ev:e,w:e.w})),...nextFast().filter(f=>state.filter==='Alle'||normCat(f.fast.cat)===state.filter)].filter(x=>progMatch(x,q)).sort((a,b)=>a.w-b.w);
   let last='',out='';
   list.forEach(x=>{const e=x.ev||{w:x.w};const k=when(e.w)+' '+e.w.getDate()+'. '+MON[e.w.getMonth()]+(e.w.getFullYear()!==now.getFullYear()?' '+e.w.getFullYear():'');
     if(k!==last){out+=`<div class="day">${k}</div>`;last=k}out+=x.ev?evItem(x.ev):fastItem(x.fast,x.w,x.ex)});
+  return out||(q?'<p class="small">Ingen treff på «'+esc(q)+'».</p>':'<p class="small">Ingen oppføringer her ennå.</p>')}
+function prog(){
+  const cats=['Alle',...allCats().filter(canSeeCat)];
   const kanLp=state.admin&&editOn();
   const kanNy=editOn();
-  return `<div class="hd"><h1>Kommende arrangementer</h1><span class="script">sett av datoene!</span></div>${kanNy?'<button class="btn primary" data-wiz style="width:auto">+ Nytt arrangement</button>':''}<div class="chips">${cats.map(c=>`<button class="chip" data-f="${esc(c)}" aria-pressed="${state.filter===c}">${esc(c)}</button>`).join('')}</div>
+  return `<div class="hd"><h1>Kommende arrangementer</h1><span class="script">sett av datoene!</span></div>${kanNy?'<button class="btn primary" data-wiz style="width:auto">+ Nytt arrangement</button>':''}
+  <input type="search" id="progQ" placeholder="Søk i program …" aria-label="Søk i program" autocomplete="off" value="${esc(state.q||'')}">
+  <div class="chips">${cats.map(c=>`<button class="chip" data-f="${esc(c)}" aria-pressed="${state.filter===c}">${esc(c)}</button>`).join('')}</div>
   ${kanLp?'<p class="small" style="margin:0 0 8px">Hold inne på et arrangement eller en fast samling for å endre eller slette.</p>':''}
-  <div class="list">${out||'<p class="small">Ingen oppføringer her ennå.</p>'}</div>`}
+  <div class="list" id="progList">${progList()}</div>`}
 
 function regList(){
   const l=regular.filter(r=>state.filter==='Alle'||normCat(r.cat)===state.filter);
@@ -538,6 +552,7 @@ function viewOpts(){
   if(adm)o.push(['leder','Gruppeleder','Du ser og får verktøyene en gruppeleder har, for gruppene du velger under.']);
   o.push(['medlem','Vanlig innlogget medlem','Bare det som er for innloggede medlemmer, ikke ledersamlinger eller innhold for bestemte grupper.'],['besok','Besøkende (ikke innlogget)','Bare det som er åpent for alle.']);
   $('#viewOpts').innerHTML=o.map(([v,l,t])=>'<label style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;font-weight:400"><input type="radio" name="viewmode" value="'+v+'" '+(viewVal()===v?'checked':'')+' style="width:22px;height:22px;flex:none;margin-top:2px"><span><b>'+esc(l)+'</b><br><span class="small">'+esc(t)+'</span>'+(v==='leder'&&state.real?'<span style="display:grid;gap:6px;margin:8px 0 0">'+GROUPS.map(g=>'<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-vl="'+g[0]+'" style="width:22px;height:22px;flex:none" '+(state.vl.includes(g[0])?'checked':'')+'>'+esc(gLabel(g[0]))+'</label>').join('')+'</span>':'')+'</span></label>').join('')}
+document.addEventListener('input',e=>{if(e.target.id==='progQ'){state.q=e.target.value;const l=$('#progList');if(l)l.innerHTML=progList()}});
 document.addEventListener('click',async e=>{
   const c=e.target.closest('button');if(!c)return;
   if(c.dataset.t){state.tab=c.dataset.t;if(state.tab==='news')markSeen();render()}
