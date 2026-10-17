@@ -41,6 +41,8 @@ details.acc>summary::after{content:"";width:10px;height:10px;border-right:3px so
 details.acc[open]>summary::after{transform:rotate(-135deg);margin-top:4px}
 details.acc>summary h2,details.acc>summary h3{margin:0}
 details.acc[open]>summary{margin-bottom:10px}
+details.acc.sub{border-top:1px solid var(--line);padding:10px 0 4px;margin-top:6px}
+details.acc.sub[open]>summary{margin-bottom:8px}
 .pw{position:relative;display:block}
 .pw input{padding-right:46px}
 .eye{position:absolute;right:2px;top:50%;transform:translateY(-50%);width:42px;height:42px;border:0;background:none;color:var(--muted);display:grid;place-items:center;border-radius:10px}
@@ -187,7 +189,7 @@ function ago(p){
 const cnt=id=>counts[id]>0?`<div class="small">${counts[id]} kommer</div>`:'';
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',snaps:null,snapMsg:'',view:'meg',acc:{},sel:{},groups:[],leads:[],ulOpen:'',psMal:'alle',psGr:[],ugOpen:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',memEA:'',memEL:'',memEM:'',memGL:[],memGM:[],snaps:null,snapMsg:'',view:'meg',acc:{},sel:{},groups:[],leads:[],ulOpen:'',psMal:'alle',psGr:[],ugOpen:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
 state.member=false;state.admin=false;state.user=null;
 {const dt=new URLSearchParams(location.search).get('tab');if(['home','prog','news','me'].includes(dt)){state.tab=dt;try{history.replaceState(null,'',location.pathname)}catch(e){}}}
@@ -342,19 +344,27 @@ function admin(){
 const EYE='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYEOFF='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.7C3.7 8.5 2 12 2 12s3.6 7 10 7c1.6 0 3-.4 4.3-1M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
 const pwField=(id,label,ac,extra)=>`<label class="f">${label}<span class="pw"><input id="${id}" type="password" autocomplete="${ac}" ${extra||''} required><button type="button" class="eye" data-eye aria-label="Vis passord" aria-pressed="false">${EYE}</button></span></label>`;
-function memberCard(){
-  const me=state.user?state.user.email:'';
-  return `<details class="card acc" data-acc="brukere" ${state.acc.brukere?'open':''}><summary><h3>Brukere (${members.length})</h3></summary>
-  <p class="small" style="margin:0 0 10px">Skriv inn e-postadressen og velg rolle. Personen får en e-post og velger passord selv.</p>
-  <form class="form" id="mem"><label class="f">E-post<input id="mE" type="email" required value="${esc(state.memE)}"></label>
-  <label class="f">Rolle<select id="mR"><option value="member" ${state.memR==='member'?'selected':''}>Medlem</option><option value="admin" ${state.memR==='admin'?'selected':''}>Administrator (kan endre innhold og brukere)</option></select></label>
-  <button class="btn primary" type="submit">Opprett bruker</button></form>
-  <p class="small" role="status" style="margin:8px 0 0">${esc(state.memMsg)}</p>
-  <div class="reg" style="margin-top:8px">${members.map(x=>{const self=x.id===me,adm=x.role==='admin';
-   return `<div class="r" style="flex-wrap:wrap"><div class="grow" style="min-width:60%">${esc(x.id)}${self?' (deg)':''}<br><span class="tag ${adm?'':'m'}">${adm?'Administrator':'Medlem'}</span>${(x.leads||[]).length?' <span class="tag">Gruppeleder</span>':''}</div>
+const userRow=(x,me)=>{
+  const self=x.id===me,adm=x.role==='admin',leader=(x.leads||[]).length>0;
+  return `<div class="r" style="flex-wrap:wrap"><div class="grow" style="min-width:60%">${esc(x.id)}${self?' (deg)':''}<br><span class="tag ${adm?'':'m'}">${adm?'Administrator':leader?'Gruppeleder':'Medlem'}</span></div>
    <details ${state.ugOpen===x.id?'open':''} style="flex-basis:100%"><summary class="small" style="cursor:pointer">Grupper (${(x.groups||[]).length})${(x.groups||[]).length?': '+esc((x.groups||[]).map(gName).join(', ')):''}</summary><div style="display:grid;gap:6px;margin:6px 0">${GROUPS.map(g=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-ug="${esc(x.id)}" data-gid="${g[0]}" style="width:22px;height:22px;flex:none" ${(x.groups||[]).includes(g[0])?'checked':''}>${esc(gLabel(g[0]))}</label>`).join('')}</div></details>
    ${adm?'':`<details ${state.ulOpen===x.id?'open':''} style="flex-basis:100%"><summary class="small" style="cursor:pointer">Leder for (${(x.leads||[]).length})${(x.leads||[]).length?': '+esc((x.leads||[]).map(gName).join(', ')):''}</summary><div class="small" style="margin:4px 0">Kan publisere nyheter, arrangementer og varsler, men bare til gruppene som er avkrysset. Personen legges også inn i gruppen.</div><div style="display:grid;gap:6px;margin:6px 0">${GROUPS.map(g=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-ul="${esc(x.id)}" data-gid="${g[0]}" style="width:22px;height:22px;flex:none" ${(x.leads||[]).includes(g[0])?'checked':''}>${esc(gLabel(g[0]))}</label>`).join('')}</div></details>`}
-   <div class="btns"><button class="btn" data-memreset="${esc(x.id)}">Nytt passord</button>${self?'':`<button class="btn" data-memrole="${esc(x.id)}" data-to="${adm?'member':'admin'}">${adm?'Gjør til medlem':'Gjør til admin'}</button><button class="btn" data-memdel="${esc(x.id)}">Fjern</button>`}</div></div>`}).join('')||'<p class="small">Ingen brukere lagt inn ennå.</p>'}</div></details>`}
+   <div class="btns"><button class="btn" data-memreset="${esc(x.id)}">Nytt passord</button>${self?'':`<button class="btn" data-memrole="${esc(x.id)}" data-to="${adm?'member':'admin'}">${adm?'Gjør til medlem':'Gjør til admin'}</button><button class="btn" data-memdel="${esc(x.id)}">Fjern</button>`}</div></div>`};
+
+function memberCard(){
+  const me=state.user?state.user.email:'';
+  const adms=members.filter(x=>x.role==='admin'),leds=members.filter(x=>x.role!=='admin'&&(x.leads||[]).length),meds=members.filter(x=>x.role!=='admin'&&!(x.leads||[]).length);
+  const sec=(key,tittel,n,body)=>`<details class="acc sub" data-acc="${key}" ${state.acc[key]?'open':''}><summary><h3 style="font-size:19px">${tittel} (${n})</h3></summary>${body}</details>`;
+  const grBoks=(sel,hjelp)=>`<fieldset class="f" style="border:0;padding:0;margin:0"><legend style="font-weight:600;font-size:14px;margin-bottom:4px">${hjelp}</legend><div style="display:grid;gap:6px">${GROUPS.map(g=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-newg="${g[0]}" style="width:22px;height:22px;flex:none" ${sel.includes(g[0])?'checked':''}>${esc(gLabel(g[0]))}</label>`).join('')}</div></fieldset>`;
+  const skjema=(id,tekst,ekstra,knapp)=>`<form class="form" id="${id}" style="margin:0 0 10px;padding:10px;background:var(--bg);border-radius:10px"><p class="small" style="margin:0">${tekst}</p><label class="f">E-post<input id="mE${id.slice(3)}" type="email" required value="${esc(state['memE'+id.slice(3)]||'')}"></label>${ekstra}<button class="btn primary" type="submit">${knapp}</button></form>`;
+  const liste=l=>`<div class="reg">${l.map(x=>userRow(x,me)).join('')||'<p class="small">Ingen ennå.</p>'}</div>`;
+  return `<details class="card acc" data-acc="brukere" ${state.acc.brukere?'open':''}><summary><h3>Brukere (${members.length})</h3></summary>
+  <p class="small" style="margin:0 0 4px">Åpne riktig rolle for å legge til en ny bruker. Personen får en e-post og velger passord selv.</p>
+  <p class="small" role="status" style="margin:0 0 6px">${esc(state.memMsg)}</p>
+  ${sec('b_adm','Administratorer',adms.length,skjema('memA','<b>Ny administrator.</b> Kan endre alt innhold og alle brukere, og sende varsler til alle. Gi bare denne rollen til dem som trenger den.','','Legg til administrator')+liste(adms))}
+  ${sec('b_led','Gruppeledere',leds.length,skjema('memL','<b>Ny gruppeleder.</b> Et medlem som kan publisere nyheter, arrangementer og varsler, men bare for gruppene hen leder.',grBoks(state.memGL,'Leder for (velg minst én)'),'Legg til gruppeleder')+liste(leds))}
+  ${sec('b_med','Medlemmer',meds.length,skjema('memM','<b>Nytt medlem.</b> Ser medlemsinnhold og innhold for gruppene hen er med i.',grBoks(state.memGM,'Med i grupper (valgfritt)'),'Legg til medlem')+liste(meds))}
+  </details>`}
 
 function pushCard(){
   const ios=/iphone|ipad|ipod/i.test(navigator.userAgent),standalone=navigator.standalone||matchMedia('(display-mode: standalone)').matches;
@@ -592,12 +602,22 @@ document.addEventListener('submit',async e=>{
     catch(er){melding=(asNews?'Nyheten er lagt ut, men v':'V')+'arselet kunne ikke sendes (ingen kontakt med varseltjenesten). Prøv igjen om litt.'}
     if(asNews)await load().catch(()=>{});
     keep(()=>state.pushSendMsg=melding)}
-  else if(f.id==='mem'){e.preventDefault();
-    const m=$('#mE').value.trim().toLowerCase(),role=$('#mR').value;
-    try{const r=await FB.addUser(m,role);state.memE='';state.memR='member';state.memMsg=r.created?'Bruker opprettet som '+(role==='admin'?'administrator':'medlem')+'. '+m+' har fått en e-post for å velge passord.':m+' hadde allerede en konto og er lagt inn som '+(role==='admin'?'administrator':'medlem')+'.'}
-    catch(er){state.memE=m;state.memR=role;state.memMsg=er.code==='auth/admin-restricted-operation'?'Registrering er slått av i Firebase (Authentication → Settings → User actions).':er.code==='auth/invalid-email'?'Ugyldig e-postadresse.':saveMsg(er.code)}
+  else if(f.id==='memA'||f.id==='memL'||f.id==='memM'){e.preventDefault();
+    const suff=f.id.slice(3),m=$('#mE'+suff).value.trim().toLowerCase(),role=f.id==='memA'?'admin':'member';
+    const gr=[...f.querySelectorAll('[data-newg]')].filter(x=>x.checked).map(x=>x.dataset.newg);
+    if(f.id==='memL'&&!gr.length){keep(()=>{state['memE'+suff]=m;state.memMsg='Velg minst én gruppe personen skal lede.'});return}
+    if(role==='admin'&&!confirm('Gi '+m+' full tilgang som administrator?\n\nAdministratorer kan endre alt innhold, alle brukere og sende varsler til alle.'))return;
+    try{
+      const r=await FB.addUser(m,role);
+      if(f.id==='memL')await FB.setLeads(m,gr,gr);
+      else if(f.id==='memM'&&gr.length)await FB.setGroups(m,'member',gr);
+      state['memE'+suff]='';state.memGL=[];state.memGM=[];
+      const hva=role==='admin'?'administrator':f.id==='memL'?'gruppeleder for '+gr.map(gName).join(', '):'medlem';
+      state.memMsg=(r.created?'Bruker opprettet som ':m+' hadde allerede en konto og er lagt inn som ')+hva+'.'+(r.created?' '+m+' har fått en e-post for å velge passord.':'');
+      state.acc[f.id==='memA'?'b_adm':f.id==='memL'?'b_led':'b_med']=true;
+    }catch(er){state['memE'+suff]=m;state.memMsg=er.code==='auth/admin-restricted-operation'?'Registrering er slått av i Firebase (Authentication → Settings → User actions).':er.code==='auth/invalid-email'?'Ugyldig e-postadresse.':saveMsg(er.code)}
     await refresh()}
-    else if(f.id==='pw'){e.preventDefault();
+  else if(f.id==='pw'){e.preventDefault();
     const o=$('#pO').value,n=$('#pN').value,r=$('#pR').value;
     if(n!==r){keep(()=>state.pwMsg='De to nye passordene er ikke like.');return}
     if(n===o){keep(()=>state.pwMsg='Det nye passordet må være et annet enn det gamle.');return}
@@ -654,6 +674,7 @@ document.addEventListener('change',async e=>{
   if(e.target.name==='viewmode'){state.view=e.target.value;$('#viewDlg').close();await refresh();return}
   if(e.target.id==='psMal'){state.psMal=e.target.value;const bx=$('#psGrBox');if(bx)bx.hidden=state.psMal!=='grupper';return}
   if('psgr' in d){const s=new Set(state.psGr);e.target.checked?s.add(d.psgr):s.delete(d.psgr);state.psGr=[...s];return}
+  if('newg' in d){const fid=e.target.closest('form')&&e.target.closest('form').id,key=fid==='memL'?'memGL':'memGM',sg=new Set(state[key]);e.target.checked?sg.add(d.newg):sg.delete(d.newg);state[key]=[...sg];return}
   if('ul' in d){
     const u=members.find(m=>m.id===d.ul);if(!u)return;
     const sl=new Set(u.leads||[]);e.target.checked?sl.add(d.gid):sl.delete(d.gid);const lead=[...sl];
