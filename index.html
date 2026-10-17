@@ -276,10 +276,12 @@ async function setRsvp(id,on,navn,kontakt){
   if(usingFb&&FB)try{await FB.rsvp(id,on?1:-1)}catch(er){keep(()=>{state.rsvp[id]=!on;save();counts[id]=Math.max(0,(counts[id]||0)+(on?-1:1))});push('Kunne ikke lagre svaret','Prøv igjen om litt.')}
 }
 
+/* Sommerstevne: åpent kort til brukeren har meldt seg på (husket på enheten), deretter et lukket kort «Sommerstevne nyhetsbrev» som kan åpnes. */
 function svCard(){
-  return `<div class="card"><h2>Sommerstevne</h2><p class="small" style="margin:6px 0 12px">Neste sommerstevne er <b>22.–27. juni 2027</b>. Legg igjen e-posten din for å få mer info.</p>
+  const done=!!lsGet('sm-sv'),body=`<p class="small" style="margin:6px 0 12px">Neste sommerstevne er <b>22.–27. juni 2027</b>. ${done?'Du er påmeldt nyhetsbrevet. Legg inn en annen e-post hvis noen flere vil ha info.':'Legg igjen e-posten din for å få mer info.'}</p>
   <form class="form" id="sv"><label class="f">E-post<input id="svE" type="email" autocomplete="email" required value="${esc(state.svE)}"></label><button class="btn primary" type="submit">Meld meg på</button></form>
-  <p class="small" role="status" style="margin:8px 0 0">${esc(state.sv)}</p><p class="small" style="margin:6px 0 0">E-posten brukes bare til informasjon om sommerstevnet.</p></div>`}
+  <p class="small" role="status" style="margin:8px 0 0">${esc(state.sv)}</p><p class="small" style="margin:6px 0 0">E-posten brukes bare til informasjon om sommerstevnet.</p>`;
+  return done?`<details class="card acc" data-acc="sv" ${state.acc.sv?'open':''}><summary><h2>Sommerstevne nyhetsbrev</h2></summary>${body}</details>`:`<div class="card"><h2>Sommerstevne</h2>${body}</div>`}
 
 function home(){
   const vis=events.filter(e=>(!e.m||state.member)&&!e.hideHome), n=vis[0];
@@ -714,7 +716,7 @@ document.addEventListener('submit',async e=>{
     await setRsvp(id,true,n,k);push('Takk, '+n+'!','Vi har registrert at du kommer.')}
   else if(f.id==='sv'){e.preventDefault();
     const m=$('#svE').value.trim().toLowerCase();
-    try{await fetch(SV_URL,{method:'POST',mode:'no-cors',body:new URLSearchParams({[SV_ENTRY]:m})});keep(()=>{state.sv='Takk! Du får info om sommerstevnet.';state.svE=''})}
+    try{await fetch(SV_URL,{method:'POST',mode:'no-cors',body:new URLSearchParams({[SV_ENTRY]:m})});lsSet('sm-sv','1');keep(()=>{state.sv='Takk! Du får info om sommerstevnet.';state.svE='';state.acc.sv=false;push('Takk!','Du får info om sommerstevnet.')})}
     catch(er){keep(()=>{state.sv='Kunne ikke melde på. Sjekk nettforbindelsen og prøv igjen.';state.svE=m})}}
   else if(f.id==='adm'){e.preventDefault();
     const t=f.dataset.type,fd=new FormData(f),d={};
