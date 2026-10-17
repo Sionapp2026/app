@@ -207,7 +207,10 @@ function when(d){const diff=Math.round((new Date(d).setHours(0,0,0,0)-new Date(n
   return diff===0?'I dag':diff===1?'I morgen':cap(DAYS[d.getDay()])}
 function dateBox(ev){const d=ev.w,e=ev.e;const m=cap(MON[d.getMonth()]);const s=e&&e.getTime()!==new Date(d).setHours(23,59,0,0)?`${d.getDate()}.${e.getMonth()===d.getMonth()?'-'+e.getDate()+'. '+m:' '+m+'-'+e.getDate()+'. '+cap(MON[e.getMonth()])}`:`${d.getDate()}. ${m}`;const yr=d.getFullYear()!==now.getFullYear()?`<br><span style="font-size:13px;opacity:.8">${d.getFullYear()}</span>`:'';return `<div class="date">${s.replace('.-','.–')}${yr}</div>`}
 function nextFast(){return regular.filter(r=>/^[0-9]{1,2}:[0-9]{2}$/.test(r.time||'')).map(r=>{const [h,mi]=r.time.split(':').map(Number),w=new Date(now);w.setHours(h,mi,0,0);w.setDate(w.getDate()+(r.day-w.getDay()+7)%7);if(w<now)w.setDate(w.getDate()+7);return {fast:r,w}})}
-function fastItem(r,w){return `<div class="item"><div class="locked" style="padding:12px;color:var(--ink)"><div class="date">${w.getDate()}. ${cap(MON[w.getMonth()])}</div><div class="grow"><b>${esc(r.title)}</b><span class="small">${when(w)} kl. ${esc(r.time)}${r.note?' · '+esc(r.note):''}</span></div><span class="tag">Fast</span></div></div>`}
+const fastId=(r,w)=>'f_'+r.id+'_'+w.getFullYear()+'-'+String(w.getMonth()+1).padStart(2,'0')+'-'+String(w.getDate()).padStart(2,'0');
+function fastItem(r,w){const id=fastId(r,w),open=state.open[id],on=state.rsvp[id];
+  return `<div class="item ${open?'open':''}"><button data-ev="${id}" aria-expanded="${!!open}"><div class="date">${w.getDate()}. ${cap(MON[w.getMonth()])}</div><div class="grow"><b>${esc(r.title)}</b><span class="small">${when(w)} kl. ${esc(r.time)}${r.note?' · '+esc(r.note):''}</span></div><span class="tag">Fast</span></button>
+   <div class="detail"><div class="small">Fast samling hver ${DAYS[r.day]}.</div><div class="btns"><button class="btn ${on?'on':''}" data-rsvp="${id}">${on?'✓ Jeg kommer':'Jeg kommer'}</button></div>${cnt(id)}</div></div>`}
 function evItem(e){
   if(e.m&&!state.member)return `<div class="item"><div class="locked" style="padding:12px">${dateBox(e)}<div class="grow"><b>${e.t}</b><span class="small">Kun for medlemmer. Logg inn under «Meg».</span></div></div></div>`;
   const open=state.open[e.id],r=state.rsvp[e.id];
@@ -230,14 +233,15 @@ const RS={arr:'entry.568243152',dato:'entry.1403655940',navn:'entry.1951632759',
 const lsGet=k=>{try{return localStorage.getItem(k)||''}catch(e){return ''}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 let rsPending=null;
+function rsEv(id){const f=String(id).match(/^f_(.+)_([0-9]{4}-[0-9]{2}-[0-9]{2})$/);if(!f)return events.find(x=>x.id==id);const r=regular.find(x=>x.id==f[1]);return r?{id,title:r.title+' (fast samling)',start:f[2]}:null}
 function openRsvp(id){
-  const ev=events.find(x=>x.id==id);if(!ev)return;
+  const ev=rsEv(id);if(!ev)return;
   rsPending=id;$('#rsT').textContent='Jeg kommer: '+ev.title;
   $('#rsN').value=lsGet('sm-navn');$('#rsK').value=lsGet('sm-kontakt')||(state.user?state.user.email:'');
   $('#rsDlg').showModal();$('#rsN').focus();
 }
 async function setRsvp(id,on,navn,kontakt){
-  const ev=events.find(x=>x.id==id)||{};
+  const ev=rsEv(id);
   keep(()=>{state.rsvp[id]=on;save();if(usingFb)counts[id]=Math.max(0,(counts[id]||0)+(on?1:-1))});
   const nm=navn||lsGet('sm-navn');
   if(nm)fetch(RS_URL,{method:'POST',mode:'no-cors',body:new URLSearchParams({[RS.arr]:ev.title||'',[RS.dato]:(ev.start||'')+(ev.end?' – '+ev.end:''),[RS.navn]:nm,[RS.kontakt]:kontakt||lsGet('sm-kontakt'),[RS.svar]:on?'Kommer':'Kommer ikke'})}).catch(()=>{});
