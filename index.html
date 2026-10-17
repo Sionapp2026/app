@@ -67,8 +67,11 @@ h3{font-size:22px;line-height:1.1}
 .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;font-weight:600;color:var(--muted)}
 .next h2{font-size:34px;margin:4px 0 6px}
 .next .meta{opacity:.9;font-size:15px}
-.alert{border-left:6px solid var(--lamp);background:var(--lamp-soft);border-radius:6px 16px 16px 6px;padding:14px 16px;box-shadow:0 4px 14px rgba(0,0,0,.12)}
-.alert b{display:block;font-size:18px;margin-bottom:2px}
+.alert{display:flex;gap:14px;align-items:flex-start;background:var(--surface);border-radius:14px;padding:16px;box-shadow:inset 0 3px 0 var(--lamp)}
+.alert .ico{flex:none;width:40px;height:40px;border-radius:50%;background:var(--lamp-soft);color:var(--lamp);display:grid;place-items:center}
+.alert .eyebrow{color:var(--lamp);display:block}
+.alert b{display:block;font-size:18px;margin:2px 0 4px}
+.alert .small{display:block;color:var(--ink);opacity:.85;line-height:1.45}
 .row{display:flex;gap:12px;align-items:center;min-width:0}
 .date{flex:none;width:92px;text-align:center;border-radius:10px;background:var(--chip);padding:12px 4px;line-height:1.1;font-weight:500;font-size:15px;white-space:nowrap}
 .grow{flex:1;min-width:0}
@@ -268,7 +271,7 @@ function home(){
    <div class="meta">${when(n.w)}${tm(n)}${n.place?' · '+esc(n.place):''}</div>
    <div class="btns" style="margin-top:12px"><button class="btn" style="color:var(--ink)" data-rsvp="${n.id}" data-stay="1">${state.rsvp[n.id]?'✓ Jeg kommer':'Jeg kommer'}</button></div>${counts[n.id]>0?`<div class="meta" style="margin-top:8px">${counts[n.id]} kommer</div>`:''}</div>`
   :`<div class="card next"><div class="eyebrow">Neste samling</div><h2>Ingen planlagt</h2><div class="meta">Se faste samlinger under Program.</div></div>`}
-  ${post?`<div class="alert"><b>${esc(post.t)}</b><span class="small">${esc(post.b)}</span></div>`:''}
+  ${post?`<div class="alert"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></div><div><span class="eyebrow">Viktig</span><b>${esc(post.t)}</b><span class="small">${esc(post.b)}</span></div></div>`:''}
   ${wk.length?`<div><h2 style="margin-bottom:10px">Kommer snart</h2><div class="list">${wk.map(x=>x.ev?evItem(x.ev):fastItem(x.fast,x.w)).join('')}</div></div>`:''}
   ${svCard()}
   <div class="card"><h2>Finn frem</h2><p class="small" style="margin:6px 0 0">Adresse: Kometvegen 7, 6419 Molde<br>Kontortid: tirsdag–torsdag kl. 10–16<br>Telefon: <a href="tel:+4771251029">71 25 10 29</a><br>E-post: <a href="mailto:post@sionmolde.no">post@sionmolde.no</a></p></div>`}
