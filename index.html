@@ -198,7 +198,7 @@ function ago(p){
 const cnt=id=>counts[id]>0?`<div class="small">${counts[id]} kommer</div>`:'';
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',leder:false,memELd:'',memEA:'',memEL:'',memEM:'',memGL:[],memGM:[],snaps:null,snapMsg:'',view:'meg',af:'Alle',acc:{},sel:{},groups:[],leads:[],ulOpen:'',psMal:'alle',psGr:[],ugOpen:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',leder:false,memELd:'',memEA:'',memEL:'',memEM:'',memGL:[],memGM:[],snaps:null,snapMsg:'',view:'meg',real:null,vl:['activ8'],af:'Alle',acc:{},sel:{},groups:[],leads:[],ulOpen:'',psMal:'alle',psGr:[],ugOpen:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
 state.member=false;state.admin=false;state.user=null;
 {const dt=new URLSearchParams(location.search).get('tab');if(['home','prog','news','me'].includes(dt)){state.tab=dt;try{history.replaceState(null,'',location.pathname)}catch(e){}}}
@@ -314,7 +314,15 @@ const effGroups=()=>state.view==='meg'?(state.groups||[]):[];
 const visOK=x=>state.view!=='besok'||!x.m;
 const effLeder=()=>state.view==='meg'&&state.leder===true;
 const canSeeCat=c=>normCat(c)!=='Ledersamling'||effAdmin()||effLeder()||effLeads().length>0||effGroups().includes('lederradet');
-const canPreview=()=>state.admin||state.leder===true||(state.leads||[]).length>0;   // eldre arrangementer og faste samlinger bruker «Møter»
+/* «Vis som gruppeleder» (bare for administrator): vi bytter midlertidig ut rollen i appen med en gruppeleder for de valgte gruppene. Reglene i databasen gjelder fortsatt administratoren. */
+function setView(v){
+  if(state.real&&v!=='leder'){Object.assign(state,state.real);state.real=null}
+  if(v==='leder'){
+    if(!state.real&&state.admin){state.real={admin:state.admin,leads:state.leads,groups:state.groups,leder:state.leder};state.admin=false;state.leder=false}
+    if(state.real){state.leads=state.vl.slice();state.groups=state.vl.slice()}
+    state.view='meg'}
+  else state.view=v}
+const canPreview=()=>state.real!==null||state.admin||state.leder===true||(state.leads||[]).length>0;   // eldre arrangementer og faste samlinger bruker «Møter»
 /* Grupper i menigheten: [id, navn, forklaring]. Samme id-er står i varsel-script.gs. Brukere plasseres i grupper under Brukere. */
 const GROUPS=[['sondagsskole','Søndagsskole','barnearbeid'],['activ8','Activ8','ungdom'],['hangout','Hangout','unge voksne'],['debora','Debora','kvinnearbeid'],['cdur','Sion C-dur','mannsfellesskap'],['kjokken','Kjøkken',''],['torsdagsgruppa','Torsdagsgruppa',''],['vertskap','Vertskap',''],['lederradet','Lederrådet',''],['ungdomsledere','Ungdomsledere',''],['sommerstevne','Sommerstevne',''],['elevate','Elevate',''],['lovsang','Lovsangsteamet','']];
 const GR_IDS=GROUPS.map(g=>g[0]);
@@ -476,7 +484,7 @@ function themeIcon(){const d=isDark(),b=$('#themeBtn');b.innerHTML=d?SUN:MOON;b.
 themeIcon();matchMedia('(prefers-color-scheme:dark)').addEventListener('change',themeIcon);
 function badge(){
   $('#badge').textContent=state.unread;$('#badge').hidden=!state.unread;
-  const vb=$('#viewBtn');if(vb){if(!vb.innerHTML)vb.innerHTML=EYE;vb.hidden=!canPreview();vb.classList.toggle('on',state.view!=='meg');vb.setAttribute('aria-label',state.view==='meg'?'Vis appen som en annen':'Du ser appen som '+(state.view==='medlem'?'vanlig medlem':'besøkende')+'. Trykk for å endre.')}
+  const vb=$('#viewBtn');if(vb){if(!vb.innerHTML)vb.innerHTML=EYE;vb.hidden=!canPreview();vb.classList.toggle('on',state.view!=='meg'||!!state.real);vb.setAttribute('aria-label',state.view==='meg'?'Vis appen som en annen':'Du ser appen som '+(state.view==='medlem'?'vanlig medlem':'besøkende')+'. Trykk for å endre.')}
 }
 const viewBanner=()=>'';
 function render(){drawTabs();$('#view').innerHTML=viewBanner()+VIEWS[state.tab]();badge();window.scrollTo(0,0)}
@@ -488,6 +496,13 @@ async function refresh(){await load();keep(()=>{})}
 const authMsg=c=>({'auth/invalid-credential':'Feil e-post eller passord.','auth/invalid-email':'Ugyldig e-postadresse.','auth/user-disabled':'Brukeren er sperret.','auth/too-many-requests':'For mange forsøk. Vent litt og prøv igjen.','auth/network-request-failed':'Ingen nettforbindelse.','auth/weak-password':'Passordet er for svakt. Bruk minst 8 tegn.','auth/requires-recent-login':'Logg ut og inn igjen, og prøv på nytt.'}[c]||'Noe gikk galt. Prøv igjen.');
 const saveMsg=c=>c==='permission-denied'?'Du har ikke tilgang til å lagre.':'Kunne ikke lagre ('+(c||'ukjent feil')+').';
 
+const viewVal=()=>state.real?'leder':state.view;
+function viewOpts(){
+  const adm=state.admin||state.real;
+  const o=[['meg',adm?'Meg selv (administrator)':state.leder?'Meg selv (leder)':'Meg selv (gruppeleder)','Du ser alt du har tilgang til.']];
+  if(adm)o.push(['leder','Gruppeleder','Du ser og får verktøyene en gruppeleder har, for gruppene du velger under.']);
+  o.push(['medlem','Vanlig innlogget medlem','Bare det som er for innloggede medlemmer, ikke ledersamlinger eller innhold for bestemte grupper.'],['besok','Besøkende (ikke innlogget)','Bare det som er åpent for alle.']);
+  $('#viewOpts').innerHTML=o.map(([v,l,t])=>'<label style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;font-weight:400"><input type="radio" name="viewmode" value="'+v+'" '+(viewVal()===v?'checked':'')+' style="width:22px;height:22px;flex:none;margin-top:2px"><span><b>'+esc(l)+'</b><br><span class="small">'+esc(t)+'</span>'+(v==='leder'&&state.real?'<span style="display:grid;gap:6px;margin:8px 0 0">'+GROUPS.map(g=>'<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-vl="'+g[0]+'" style="width:22px;height:22px;flex:none" '+(state.vl.includes(g[0])?'checked':'')+'>'+esc(gLabel(g[0]))+'</label>').join('')+'</span>':'')+'</span></label>').join('')}
 document.addEventListener('click',async e=>{
   const c=e.target.closest('button');if(!c)return;
   if(c.dataset.t){state.tab=c.dataset.t;if(state.tab==='news')markSeen();render()}
@@ -619,8 +634,7 @@ document.addEventListener('click',async e=>{
     }catch(er){state.msg=saveMsg(er.code)}
     await refresh()}
   else if(c.id==='viewBtn'||c.closest&&c.closest('#viewBtn')){
-    const o=[['meg',state.admin?'Meg selv (administrator)':state.leder?'Meg selv (leder)':'Meg selv (gruppeleder)','Du ser alt du har tilgang til.'],['medlem','Vanlig innlogget medlem','Bare det som er for innloggede medlemmer, ikke ledersamlinger eller innhold for bestemte grupper.'],['besok','Besøkende (ikke innlogget)','Bare det som er åpent for alle.']];
-    $('#viewOpts').innerHTML=o.map(([v,l,t])=>`<label style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;font-weight:400"><input type="radio" name="viewmode" value="${v}" ${state.view===v?'checked':''} style="width:22px;height:22px;flex:none;margin-top:2px"><span><b>${esc(l)}</b><br><span class="small">${esc(t)}</span></span></label>`).join('');
+    viewOpts();
     $('#viewDlg').showModal()}
   else if('viewclose' in c.dataset){$('#viewDlg').close()}
   else if(c.id==='themeBtn'){const r=document.documentElement;r.dataset.theme=isDark()?'light':'dark';try{localStorage.setItem('sm-theme',r.dataset.theme)}catch(e){}themeIcon()}
@@ -754,7 +768,8 @@ async function loadSnaps(){
 document.addEventListener('toggle',e=>{const k=e.target&&e.target.dataset&&e.target.dataset.acc;if(k){state.acc[k]=e.target.open;if(k==='tilbake'&&e.target.open&&state.snaps===null&&FB&&state.admin)loadSnaps()}},true);
 document.addEventListener('change',async e=>{
   const d=e.target.dataset||{};
-  if(e.target.name==='viewmode'){state.view=e.target.value;$('#viewDlg').close();await refresh();return}
+  if(e.target.name==='viewmode'){const v=e.target.value;setView(v);if(v==='leder'){viewOpts()}else $('#viewDlg').close();await refresh();return}
+  if('vl' in d){const sg=new Set(state.vl);e.target.checked?sg.add(d.vl):sg.delete(d.vl);if(!sg.size){e.target.checked=true;return}state.vl=[...sg];setView('leder');await refresh();viewOpts();return}
   if(e.target.id==='psMal'){state.psMal=e.target.value;const bx=$('#psGrBox');if(bx)bx.hidden=state.psMal!=='grupper';return}
   if('psgr' in d){const s=new Set(state.psGr);e.target.checked?s.add(d.psgr):s.delete(d.psgr);state.psGr=[...s];return}
   if('newg' in d){const fid=e.target.closest('form')&&e.target.closest('form').id,key=fid==='memL'?'memGL':'memGM',sg=new Set(state[key]);e.target.checked?sg.add(d.newg):sg.delete(d.newg);state[key]=[...sg];return}
@@ -782,7 +797,7 @@ async function start(){
     state.admin=u?await FB.isAdmin(u.email):false;
     state.member=!!u&&(state.admin||await FB.isMember(u.email));
     FB.full=state.member;
-    state.view='meg';
+    state.view='meg';state.real=null;
     if(state.admin)FB.ensureSnapshot('Automatisk',20*3600e3).then(()=>{state.snaps=null}).catch(()=>{});
     state.groups=u&&state.member?await FB.myGroups(u.email):[];
     state.leads=u&&state.member&&!state.admin?await FB.myLeads(u.email):[];
