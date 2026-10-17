@@ -167,10 +167,10 @@ async function fetchAll(){
 async function load(){
   const [e,p,g]=await fetchAll();
   rawEvents=e;
-  events=e.filter(canSee).map(x=>({...x,t:esc(x.title),d:esc(x.text),w:new Date(x.start+'T'+(x.time||'00:00')),e:x.end?new Date(x.end+'T23:59'):null}))
+  events=e.filter(x=>canSee(x)&&canSeeCat(x.cat)).map(x=>({...x,t:esc(x.title),d:esc(x.text),w:new Date(x.start+'T'+(x.time||'00:00')),e:x.end?new Date(x.end+'T23:59'):null}))
     .filter(x=>(x.e||x.w)>=todayStart).sort((a,b)=>a.w-b.w);
   posts=p.filter(canSee).sort((a,b)=>(b.ms||0)-(a.ms||0));
-  regular=g.slice().sort((a,b)=>((a.day+6)%7-(b.day+6)%7)||String(a.time).localeCompare(String(b.time)));
+  regular=g.filter(r=>canSeeCat(r.cat)).sort((a,b)=>((a.day+6)%7-(b.day+6)%7)||String(a.time).localeCompare(String(b.time)));
   counts=usingFb&&FB?await FB.counts().catch(()=>({})):{};
   members=state.admin&&FB?await FB.listUsers().catch(()=>[]):[];
   state.unread=posts.filter(isNew).length;
@@ -255,7 +255,7 @@ function home(){
   <div class="card"><h2>Finn frem</h2><p class="small" style="margin:6px 0 0">Adresse: Kometvegen 7, 6419 Molde<br>Kontortid: tirsdag–torsdag kl. 10–16<br>Telefon: <a href="tel:+4771251029">71 25 10 29</a><br>E-post: <a href="mailto:post@sionmolde.no">post@sionmolde.no</a></p></div>`}
 
 function prog(){
-  const cats=['Alle',...CATS];
+  const cats=['Alle',...CATS.filter(canSeeCat)];
   const list=events.filter(e=>state.filter==='Alle'||normCat(e.cat)===state.filter);
   let last='',out='';
   list.forEach(e=>{const k=when(e.w)+' '+e.w.getDate()+'. '+MON[e.w.getMonth()]+(e.w.getFullYear()!==now.getFullYear()?' '+e.w.getFullYear():'');
@@ -276,7 +276,9 @@ function news(){
 
 /* ---------- Innlogging og administrasjon ---------- */
 const CATS=['Møte','Samling','Ledersamling','Menighetsmøte','Happeninger','Ungdom'];
-const normCat=c=>c==='Møter'?'Møte':c;   // eldre arrangementer og faste samlinger bruker «Møter»
+const normCat=c=>c==='Møter'?'Møte':c;
+/* «Ledersamling» er bare for ledere: administratorer, gruppeledere og medlemmer i gruppen Lederrådet. Andre ser verken kategorien eller arrangementene. */
+const canSeeCat=c=>normCat(c)!=='Ledersamling'||state.admin||(state.leads||[]).length>0||(state.groups||[]).includes('lederradet');   // eldre arrangementer og faste samlinger bruker «Møter»
 /* Grupper i menigheten: [id, navn, forklaring]. Samme id-er står i varsel-script.gs. Brukere plasseres i grupper under Brukere. */
 const GROUPS=[['sondagsskole','Søndagsskole','barnearbeid'],['activ8','Activ8','ungdom'],['hangout','Hangout','unge voksne'],['debora','Debora','kvinnearbeid'],['cdur','Sion C-dur','mannsfellesskap'],['kjokken','Kjøkken',''],['torsdagsgruppa','Torsdagsgruppa',''],['vertskap','Vertskap',''],['lederradet','Lederrådet',''],['ungdomsledere','Ungdomsledere',''],['sommerstevne','Sommerstevne','']];
 const GR_IDS=GROUPS.map(g=>g[0]);
@@ -554,8 +556,8 @@ document.addEventListener('submit',async e=>{
       else if(gs.length){d.audience=gs;d.groups=gs;d.tag=gs.map(gName).join(' · ');d.m=true}
       else{d.audience=['Medlem'];d.groups=[];d.tag='Medlem';d.m=true}
     }
-    if(t==='regular'){d.m=false;if(!d.time){keep(()=>state.msg='Velg eller skriv inn klokkeslett.');return}}
-    if(t==='events'){d.groups=(d.groups||[]).filter(x=>GR_IDS.includes(x));d.m=!!d.m||d.groups.length>0}
+    if(t==='regular'){d.m=normCat(d.cat)==='Ledersamling';if(!d.time){keep(()=>state.msg='Velg eller skriv inn klokkeslett.');return}}
+    if(t==='events'){d.groups=(d.groups||[]).filter(x=>GR_IDS.includes(x));d.m=!!d.m||d.groups.length>0||normCat(d.cat)==='Ledersamling'}
     const isEdit=!!state.adm.edit;
     try{
       if(state.adm.edit)await FB.set(COL[t],state.adm.edit,d);else await FB.add(COL[t],d);
