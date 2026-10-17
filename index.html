@@ -35,6 +35,12 @@ header.top{display:flex;align-items:center;justify-content:space-between;gap:12p
 .logo span{font-size:13px;color:var(--muted)}
 dialog{background:var(--surface);color:var(--ink);border:0;border-radius:16px;padding:18px;width:min(92vw,400px);box-shadow:0 10px 30px rgba(0,0,0,.3)}
 dialog::backdrop{background:rgba(5,20,40,.55)}
+details.acc>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px}
+details.acc>summary::-webkit-details-marker{display:none}
+details.acc>summary::after{content:"";width:10px;height:10px;border-right:3px solid var(--muted);border-bottom:3px solid var(--muted);transform:rotate(45deg);margin:-4px 4px 0 0;transition:transform .15s;flex:none}
+details.acc[open]>summary::after{transform:rotate(-135deg);margin-top:4px}
+details.acc>summary h2,details.acc>summary h3{margin:0}
+details.acc[open]>summary{margin-bottom:10px}
 .pw{position:relative;display:block}
 .pw input{padding-right:46px}
 .eye{position:absolute;right:2px;top:50%;transform:translateY(-50%);width:42px;height:42px;border:0;background:none;color:var(--muted);display:grid;place-items:center;border-radius:10px}
@@ -177,7 +183,7 @@ function ago(p){
 const cnt=id=>counts[id]>0?`<div class="small">${counts[id]} kommer</div>`:'';
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',sel:{},groups:[],leads:[],ulOpen:'',psMal:'alle',psGr:[],ugOpen:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',acc:{},sel:{},groups:[],leads:[],ulOpen:'',psMal:'alle',psGr:[],ugOpen:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
 state.member=false;state.admin=false;state.user=null;
 {const dt=new URLSearchParams(location.search).get('tab');if(['home','prog','news','me'].includes(dt)){state.tab=dt;try{history.replaceState(null,'',location.pathname)}catch(e){}}}
@@ -311,23 +317,23 @@ function admLabel(t,x){return t==='events'?`${esc(x.start)} · ${esc(x.title)}${
 function admin(){
   const t=state.adm.type,items=admItems(t),ed=state.adm.edit?items.find(x=>x.id==state.adm.edit):null;
   const nSel=items.filter(x=>state.sel[x.id]).length;
-  return `<div class="card"><h2>${state.admin?'Administrator':'Publiser for gruppene dine'}</h2>
+  return `<details class="card acc" data-acc="adm" ${state.acc.adm?'open':''}><summary><h2>${state.admin?'Administrator':'Publiser for gruppene dine'}</h2></summary>
   ${usingFb||!state.admin?'':`<p class="small" style="margin:8px 0">Databasen er tom, og appen viser innholdet fra JSON-filene. Flytt det over først, ellers forsvinner det når du legger til noe nytt.</p><button class="btn" data-aimport>Flytt eksisterende innhold til databasen</button>`}
   <div class="chips" style="margin:12px 0">${TYPES.filter(([k])=>state.admin||k!=='regular').map(([k,l])=>`<button class="chip" data-at="${k}" aria-pressed="${t===k}">${l}</button>`).join('')}</div>
   <form class="form" id="adm" data-type="${t}">${fields(t,ed)}
    <div class="btns"><button class="btn primary" type="submit" style="width:auto">${ed?'Lagre endring':'Legg til'}</button>${ed?'<button class="btn" type="button" data-acancel>Avbryt</button>':''}</div></form>
-  <p class="small" role="status" style="margin:8px 0 0">${esc(state.msg)}</p></div>
-  <div class="card"><h3 style="margin-bottom:6px">Eksisterende</h3>
+  <p class="small" role="status" style="margin:8px 0 0">${esc(state.msg)}</p></details>
+  <details class="card acc" data-acc="eks" ${state.acc.eks?'open':''}><summary><h3>Eksisterende (${items.length})</h3></summary>
   ${items.length?`<div class="btns" style="align-items:center;margin:4px 0 8px"><label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" data-aselall style="width:22px;height:22px" ${nSel===items.length?'checked':''}>Velg alle</label>
   <button class="btn" data-adelsel ${nSel?'':'disabled'}>Slett valgte (${nSel})</button></div>`:''}
-  <div class="reg">${items.map(x=>`<div class="r"><input type="checkbox" data-asel="${esc(x.id)}" aria-label="Velg" style="width:22px;height:22px;flex:none;align-self:center" ${state.sel[x.id]?'checked':''}><div class="grow">${admLabel(t,x)}</div><button class="btn" data-aedit="${esc(x.id)}">Rediger</button><button class="btn" data-adel="${esc(x.id)}">Slett</button></div>`).join('')||'<p class="small">Ingenting ennå.</p>'}</div></div>`}
+  <div class="reg">${items.map(x=>`<div class="r"><input type="checkbox" data-asel="${esc(x.id)}" aria-label="Velg" style="width:22px;height:22px;flex:none;align-self:center" ${state.sel[x.id]?'checked':''}><div class="grow">${admLabel(t,x)}</div><button class="btn" data-aedit="${esc(x.id)}">Rediger</button><button class="btn" data-adel="${esc(x.id)}">Slett</button></div>`).join('')||'<p class="small">Ingenting ennå.</p>'}</div></details>`}
 
 const EYE='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const EYEOFF='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.7C3.7 8.5 2 12 2 12s3.6 7 10 7c1.6 0 3-.4 4.3-1M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
 const pwField=(id,label,ac,extra)=>`<label class="f">${label}<span class="pw"><input id="${id}" type="password" autocomplete="${ac}" ${extra||''} required><button type="button" class="eye" data-eye aria-label="Vis passord" aria-pressed="false">${EYE}</button></span></label>`;
 function memberCard(){
   const me=state.user?state.user.email:'';
-  return `<div class="card"><h3 style="margin-bottom:6px">Brukere (${members.length})</h3>
+  return `<details class="card acc" data-acc="brukere" ${state.acc.brukere?'open':''}><summary><h3>Brukere (${members.length})</h3></summary>
   <p class="small" style="margin:0 0 10px">Skriv inn e-postadressen og velg rolle. Personen får en e-post og velger passord selv.</p>
   <form class="form" id="mem"><label class="f">E-post<input id="mE" type="email" required value="${esc(state.memE)}"></label>
   <label class="f">Rolle<select id="mR"><option value="member" ${state.memR==='member'?'selected':''}>Medlem</option><option value="admin" ${state.memR==='admin'?'selected':''}>Administrator (kan endre innhold og brukere)</option></select></label>
@@ -337,7 +343,7 @@ function memberCard(){
    return `<div class="r" style="flex-wrap:wrap"><div class="grow" style="min-width:60%">${esc(x.id)}${self?' (deg)':''}<br><span class="tag ${adm?'':'m'}">${adm?'Administrator':'Medlem'}</span>${(x.leads||[]).length?' <span class="tag">Gruppeleder</span>':''}</div>
    <details ${state.ugOpen===x.id?'open':''} style="flex-basis:100%"><summary class="small" style="cursor:pointer">Grupper (${(x.groups||[]).length})${(x.groups||[]).length?': '+esc((x.groups||[]).map(gName).join(', ')):''}</summary><div style="display:grid;gap:6px;margin:6px 0">${GROUPS.map(g=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-ug="${esc(x.id)}" data-gid="${g[0]}" style="width:22px;height:22px;flex:none" ${(x.groups||[]).includes(g[0])?'checked':''}>${esc(gLabel(g[0]))}</label>`).join('')}</div></details>
    ${adm?'':`<details ${state.ulOpen===x.id?'open':''} style="flex-basis:100%"><summary class="small" style="cursor:pointer">Leder for (${(x.leads||[]).length})${(x.leads||[]).length?': '+esc((x.leads||[]).map(gName).join(', ')):''}</summary><div class="small" style="margin:4px 0">Kan publisere nyheter, arrangementer og varsler, men bare til gruppene som er avkrysset. Personen legges også inn i gruppen.</div><div style="display:grid;gap:6px;margin:6px 0">${GROUPS.map(g=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-ul="${esc(x.id)}" data-gid="${g[0]}" style="width:22px;height:22px;flex:none" ${(x.leads||[]).includes(g[0])?'checked':''}>${esc(gLabel(g[0]))}</label>`).join('')}</div></details>`}
-   <div class="btns"><button class="btn" data-memreset="${esc(x.id)}">Nytt passord</button>${self?'':`<button class="btn" data-memrole="${esc(x.id)}" data-to="${adm?'member':'admin'}">${adm?'Gjør til medlem':'Gjør til admin'}</button><button class="btn" data-memdel="${esc(x.id)}">Fjern</button>`}</div></div>`}).join('')||'<p class="small">Ingen brukere lagt inn ennå.</p>'}</div></div>`}
+   <div class="btns"><button class="btn" data-memreset="${esc(x.id)}">Nytt passord</button>${self?'':`<button class="btn" data-memrole="${esc(x.id)}" data-to="${adm?'member':'admin'}">${adm?'Gjør til medlem':'Gjør til admin'}</button><button class="btn" data-memdel="${esc(x.id)}">Fjern</button>`}</div></div>`}).join('')||'<p class="small">Ingen brukere lagt inn ennå.</p>'}</div></details>`}
 
 function pushCard(){
   const ios=/iphone|ipad|ipod/i.test(navigator.userAgent),standalone=navigator.standalone||matchMedia('(display-mode: standalone)').matches;
@@ -345,11 +351,11 @@ function pushCard(){
   const body=ios&&!standalone?'På iPhone må du først legge appen på hjemskjermen (Del → Legg til på Hjem-skjerm), og så slå på varsler derfra.'
     :!FB||!state.pushOk?'Varsler støttes ikke i denne nettleseren.'
     :on?'<button class="btn" data-pushoff>Slå av varsler</button> <button class="btn" data-pushcopy>Kopier varselkode</button>':'<button class="btn primary" data-pushon style="width:auto">Slå på varsler</button>';
-  return `<div class="card"><h2>Varsler</h2><p class="small" style="margin:6px 0 12px">Få beskjed om nyheter og endringer, også når appen er lukket.</p>${body}<p class="small" role="status" style="margin:8px 0 0">${esc(state.pushMsg)}</p></div>`}
+  return `<details class="card acc" data-acc="varsler" ${state.acc.varsler?'open':''}><summary><h2>Varsler</h2></summary><p class="small" style="margin:0 0 12px">Få beskjed om nyheter og endringer, også når appen er lukket.</p>${body}<p class="small" role="status" style="margin:8px 0 0">${esc(state.pushMsg)}</p></details>`}
 
 function pushAdmin(){
   if(!PUSH_URL)return '';
-  return `<div class="card"><h3 style="margin-bottom:6px">Send varsel</h3>
+  return `<details class="card acc" data-acc="sendvarsel" ${state.acc.sendvarsel?'open':''}><summary><h3>Send varsel</h3></summary>
   <p class="small" style="margin:0 0 10px">Skriv ikke noe sensitivt, for varselet kan vises på låst skjerm. Varsler til medlemmer og grupper når bare dem som er innlogget og har slått på varsler.</p>
   <form class="form" id="pushsend"><label class="f">Tittel<input id="psT" maxlength="60" required value="${esc(state.psT)}"></label>
   <label class="f">Tekst<textarea id="psB" rows="3" maxlength="500">${esc(state.psB)}</textarea></label>
@@ -360,13 +366,13 @@ function pushAdmin(){
   <div id="psGrBox" ${!state.admin||state.psMal==='grupper'?'':'hidden'} style="display:grid;gap:6px">${GROUPS.filter(g=>state.admin||(state.leads||[]).includes(g[0])).map(g=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-psgr="${g[0]}" style="width:22px;height:22px;flex:none" ${state.psGr.includes(g[0])?'checked':''}>${esc(gLabel(g[0]))}</label>`).join('')}</div>
   <label class="f">Når noen trykker på varselet, åpnes<select id="psTab">${[['news','Nyheter'],['home','Hjem'],['prog','Program']].map(([v,l])=>`<option value="${v}" ${state.psTab===v?'selected':''}>${l}</option>`).join('')}</select></label>
   <button class="btn primary" type="submit">Send varsel</button></form>
-  <p class="small" role="status" style="margin:8px 0 0">${esc(state.pushSendMsg)}</p></div>`}
+  <p class="small" role="status" style="margin:8px 0 0">${esc(state.pushSendMsg)}</p></details>`}
 
 function backupCard(){
-  return `<div class="card"><h3 style="margin-bottom:6px">Sikkerhetskopi</h3>
+  return `<details class="card acc" data-acc="kopi" ${state.acc.kopi?'open':''}><summary><h3>Sikkerhetskopi</h3></summary>
   <p class="small" style="margin:0 0 10px">Laster ned en fil med alle arrangementer, nyheter, faste samlinger, brukerlister og tellere. Filen inneholder e-postadresser til brukerne, så oppbevar den trygt og del den ikke utenfor administratorene. Ta en kopi av og til.</p>
   <button class="btn" data-backup>Last ned sikkerhetskopi</button>
-  <p class="small" role="status" style="margin:8px 0 0">${esc(state.backupMsg)}</p></div>`}
+  <p class="small" role="status" style="margin:8px 0 0">${esc(state.backupMsg)}</p></details>`}
 
 function loginCard(){
   if(state.user)return `<div class="card"><div class="row"><div class="grow"><b>${state.admin?'Innlogget som administrator':isLeader()?'Innlogget som gruppeleder':state.member?'Innlogget som medlem':'Innlogget, men ikke på medlemslisten'}</b><div class="small">${esc(state.user.email)}</div></div>
@@ -387,7 +393,7 @@ function me(){
   const sw=(k,l,s)=>`<div class="switch"><div><b>${l}</b><div class="small">${s}</div></div><button class="tg" role="switch" aria-checked="${state.prefs[k]}" aria-label="${l}" data-pref="${k}"></button></div>`;
   return `<h1>Meg</h1>${loginCard()}
   ${pushCard()}
-  ${state.user?`<div class="card"><h2>Medlem i flere menigheter?</h2><p class="small" style="margin:6px 0 0">Mange medlemmer står registrert i andre menigheter enn Sion, og da mister vi statsstøtten for dem. <a href="https://person.brreg.no/nb/minside/tros-og-livssyn" target="_blank" rel="noopener">Sjekk her om du er medlem andre steder</a>. Takk for hjelpen!</p></div>`:''}
+  ${state.user?`<details class="card acc" data-acc="flere" ${state.acc.flere?'open':''}><summary><h2>Medlem i flere menigheter?</h2></summary><p class="small" style="margin:0">Mange medlemmer står registrert i andre menigheter enn Sion, og da mister vi statsstøtten for dem. <a href="https://person.brreg.no/nb/minside/tros-og-livssyn" target="_blank" rel="noopener">Sjekk her om du er medlem andre steder</a>. Takk for hjelpen!</p></details>`:''}
 
   ${state.admin?admin()+pushAdmin()+memberCard()+backupCard():isLeader()?admin()+pushAdmin():''}`}
 
@@ -456,7 +462,7 @@ document.addEventListener('click',async e=>{
     if(!m){keep(()=>state.err='Skriv inn e-postadressen din først.');return}
     try{await FB.reset(m);keep(()=>state.err='Hvis adressen er registrert, er en lenke for nytt passord sendt.')}catch(er){keep(()=>state.err=authMsg(er.code))}}
   else if(c.dataset.at){keep(()=>{state.adm={type:c.dataset.at,edit:null};state.msg='';state.sel={}})}
-  else if(c.dataset.aedit){keep(()=>{state.adm.edit=c.dataset.aedit;state.msg=''})}
+  else if(c.dataset.aedit){keep(()=>{state.adm.edit=c.dataset.aedit;state.msg='';state.acc.adm=true});setTimeout(()=>{const f=$('#adm');if(f)f.scrollIntoView({block:'start'})},60)}
   else if('acancel' in c.dataset){keep(()=>{state.adm.edit=null;state.msg=''})}
   else if('adelsel' in c.dataset){
     const t=state.adm.type,ids=admItems(t).filter(x=>state.sel[x.id]).map(x=>String(x.id));
@@ -562,6 +568,7 @@ document.addEventListener('submit',async e=>{
     await refresh()}
 });
 
+document.addEventListener('toggle',e=>{const k=e.target&&e.target.dataset&&e.target.dataset.acc;if(k)state.acc[k]=e.target.open},true);
 document.addEventListener('change',async e=>{
   const d=e.target.dataset||{};
   if(e.target.id==='psMal'){state.psMal=e.target.value;const bx=$('#psGrBox');if(bx)bx.hidden=state.psMal!=='grupper';return}
