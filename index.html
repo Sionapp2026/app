@@ -303,7 +303,8 @@ function prog(){
   list.forEach(x=>{const e=x.ev||{w:x.w};const k=when(e.w)+' '+e.w.getDate()+'. '+MON[e.w.getMonth()]+(e.w.getFullYear()!==now.getFullYear()?' '+e.w.getFullYear():'');
     if(k!==last){out+=`<div class="day">${k}</div>`;last=k}out+=x.ev?evItem(x.ev):fastItem(x.fast,x.w,x.ex)});
   const kanLp=state.admin&&state.view==='meg';
-  return `<div class="hd"><h1>Kommende arrangementer</h1><span class="script">sett av datoene!</span></div><div class="chips">${cats.map(c=>`<button class="chip" data-f="${c}" aria-pressed="${state.filter===c}">${c}</button>`).join('')}</div>
+  const kanNy=state.view==='meg'&&(state.admin||isLeader());
+  return `<div class="hd"><h1>Kommende arrangementer</h1><span class="script">sett av datoene!</span></div>${kanNy?'<button class="btn primary" data-wiz style="width:auto">+ Nytt arrangement</button>':''}<div class="chips">${cats.map(c=>`<button class="chip" data-f="${c}" aria-pressed="${state.filter===c}">${c}</button>`).join('')}</div>
   ${kanLp?'<p class="small" style="margin:0 0 8px">Hold inne på et arrangement eller en fast samling for å endre eller slette.</p>':''}
   <div class="list">${out||'<p class="small">Ingen oppføringer her ennå.</p>'}</div>`}
 
@@ -360,7 +361,7 @@ const FIELDS={
  regular:[['title','Tittel','text*'],['day','Ukedag','sel',[1,2,3,4,5,6,0]],['time','Klokkeslett','combo*',TIMES,'time'],['note','Merknad','text'],['cat','Kategori','sel',CATS]]};
 const COL={events:'events',posts:'posts',regular:'regular'};
 const TYPES=[['events','Arrangement'],['posts','Nyhet'],['regular','Fast samling']];
-function fields(t,ed){return FIELDS[t].filter(f=>(f[0]!=='push'||(PUSH_URL&&!ed))&&(state.admin||f[0]!=='m')).map(([k,l,ty,o,it])=>{
+function fields(t,ed,only){return FIELDS[t].filter(f=>(!only||only.includes(f[0]))&&(f[0]!=='push'||(PUSH_URL&&!ed))&&(state.admin||f[0]!=='m')).map(([k,l,ty,o,it])=>{
   const req=ty.endsWith('*'),b=ty.replace('*',''),v=ed?ed[k]:undefined;
   if(b==='combo'){const known=!v||o.includes(v),cur=!ed?o[0]:!v?(req?o[0]:''):known?v:'__annet';
     return `<label class="f">${l}<select name="${k}Sel">${o.map(x=>`<option value="${x}" ${cur===x?'selected':''}>${x}</option>`).join('')}${req?'':`<option value="" ${cur===''?'selected':''}>Ikke oppgitt</option>`}<option value="__annet" ${cur==='__annet'?'selected':''}>Annet</option></select><input name="${k}" type="${it}" value="${known?'':esc(v)}" ${known?'hidden':''}></label>`}
@@ -621,6 +622,7 @@ document.addEventListener('click',async e=>{
   else if(c.dataset.at){keep(()=>{state.adm={type:c.dataset.at,edit:null,form:false};state.msg='';state.sel={}})}
   else if(c.dataset.aedit){keep(()=>{state.adm.edit=c.dataset.aedit;state.msg='';state.acc.adm=true});setTimeout(()=>{const f=$('#adm');if(f)f.scrollIntoView({block:'start'})},60)}
   else if('pubnew' in c.dataset){pubAsk()}
+  else if('wiz' in c.dataset){wizAsk()}
   else if('anew' in c.dataset){keep(()=>{state.adm.form=true;state.adm.edit=null;state.msg=''});setTimeout(()=>{const f=$('#adm');if(f)f.scrollIntoView({block:'start'})},60)}
   else if('acancel' in c.dataset){keep(()=>{state.adm.edit=null;state.adm.form=false;state.msg=''})}
   else if('adelsel' in c.dataset){
@@ -736,7 +738,7 @@ document.addEventListener('submit',async e=>{
     try{
       if(state.adm.edit)await FB.set(COL[t],state.adm.edit,d);else await FB.add(COL[t],d);
       state.msg='Lagret.';state.adm.edit=null;state.adm.form=false;usingFb=true;
-      {const pd=document.querySelector('dialog.pub');if(pd){pd.close();push('Publisert','Nyheten er lagt ut.')}}
+      {const pd=document.querySelector('dialog.pub');if(pd){pd.close();push('Lagret',t==='posts'?'Nyheten er lagt ut.':'Lagt til i programmet.')}}
       if(wantPush&&!isEdit){
         const mal=d.groups&&d.groups.length?{type:'grupper',groups:d.groups}:d.m?{type:'medlem'}:{type:'alle'};
         try{const r=await FB.sendPush(PUSH_URL,d.t,String(d.b||'').slice(0,140),'news',mal);state.msg='Lagret. '+(r.ok?'Varsel sendt til '+r.sendt+' av '+r.enheter+' enheter ('+malTekst(mal)+').':'Varsel ikke sendt: '+r.feil)}catch(x){state.msg='Lagret. Varsel kunne ikke sendes (ingen kontakt med varseltjenesten).'}
@@ -754,6 +756,64 @@ document.addEventListener('pointerdown',e=>{lpFired=false;clearTimeout(lpT);
 document.addEventListener('pointermove',e=>{if(lpT&&Math.hypot(e.clientX-lpX,e.clientY-lpY)>10)clearTimeout(lpT)});
 document.addEventListener('contextmenu',e=>{if((state.admin&&e.target.closest('[data-lp]'))||(state.tab==='news'&&e.target.closest('#view .lpzone, #view h1')))e.preventDefault()});
 document.addEventListener('click',e=>{if(lpFired){lpFired=false;e.stopPropagation();e.preventDefault()}},true);
+/* Veiviser for nytt arrangement / fast samling: ett steg om gangen, store linjer først. Bruker det vanlige skjemaet (#adm), så lagring og regler er de samme. */
+const WIZ={
+  events:[
+    {h:'Hva slags arrangement?',p:'Start med de store linjene.',keys:['title','cat']},
+    {h:'Hvem er det for?',p:'',keys:['groups','m']},
+    {h:'Når skjer det?',p:'Sluttdato trengs bare hvis det varer flere dager.',keys:['start','end','time']},
+    {h:'Hvor og hvem?',p:'Alt her er valgfritt.',keys:['place','who','text']},
+    {h:'Se over og opprett',p:'',keys:['hideHome'],sum:true}],
+  regular:[
+    {h:'Hva slags samling?',p:'En fast samling gjentas hver uke.',keys:['title','cat']},
+    {h:'Når er den?',p:'',keys:['day','time']},
+    {h:'Se over og opprett',p:'Merknad er valgfritt, for eksempel «Oddetallsuker».',keys:['note'],sum:true}]};
+function wizAsk(){
+  if(document.querySelector('dialog.pub'))return;
+  const dlg=document.createElement('dialog');dlg.className='lp pub';document.body.appendChild(dlg);
+  const iv=setInterval(()=>{const m=$('#pubMsg');if(m&&state.msg)m.textContent=state.msg},300);
+  dlg.addEventListener('close',()=>{clearInterval(iv);dlg.remove();state.msg=''});
+  dlg.addEventListener('click',e=>{if(e.target.closest('[data-pubclose]'))dlg.close()});
+  if(state.admin){
+    dlg.innerHTML='<h3 style="margin:0 0 4px">Hva vil du opprette?</h3><div class="btns col" style="margin-top:10px"><button class="btn primary" type="button" data-wizt="events">Arrangement</button><button class="btn" type="button" data-wizt="regular">Fast samling (hver uke)</button><button class="btn" type="button" data-pubclose>Avbryt</button></div>';
+    dlg.addEventListener('click',e=>{const b=e.target.closest('[data-wizt]');if(b)wizStart(dlg,b.dataset.wizt)});
+  }else wizStart(dlg,'events');
+  dlg.showModal();
+}
+function wizStart(dlg,t){
+  state.adm={type:t,edit:null,form:false};state.msg='';
+  const steps=WIZ[t],n=steps.length;let cur=0;
+  dlg.innerHTML='<div class="small" id="wizN" style="margin:0 0 6px"></div><div style="height:6px;background:var(--line);border-radius:99px;overflow:hidden;margin-bottom:12px"><div id="wizBar" style="height:100%;background:var(--lamp);width:0;transition:width .25s"></div></div>'
+   +'<form class="form" id="adm" data-type="'+t+'" novalidate>'
+   +steps.map((st,i)=>'<div class="wizs" data-i="'+i+'" style="display:none;gap:12px"><div><h3 style="margin:0">'+esc(st.h)+'</h3>'+(st.p?'<p class="small" style="margin:4px 0 0">'+esc(st.p)+'</p>':'')+'</div>'+(st.sum?'<div id="wizSum" class="card" style="background:var(--bg);display:grid;gap:4px;font-size:15px"></div>':'')+fields(t,null,st.keys)+'</div>').join('')
+   +'<div class="btns" style="margin-top:6px"><button class="btn" type="button" id="wizBack">Tilbake</button><button class="btn primary" type="button" id="wizNext" style="width:auto">Neste</button><button class="btn primary" type="submit" id="wizGo" style="width:auto" disabled>Opprett</button><button class="btn" type="button" data-pubclose>Avbryt</button></div></form><p class="small" role="status" id="pubMsg" style="margin:8px 0 0"></p>';
+  const f=dlg.querySelector('#adm'),stepEl=i=>f.querySelector('.wizs[data-i="'+i+'"]');
+  const kat=k=>{const e=f.elements[k];return e?(e.value||''):''};
+  const summary=()=>{
+    const fd=new FormData(f),g=k=>String(fd.get(k)||'').trim(),L=[];
+    const rad=(a,b)=>b?'<div><span class="small">'+esc(a)+':</span> <b>'+esc(b)+'</b></div>':'';
+    if(t==='events'){
+      const gr=fd.getAll('groups'),hvem=gr.length?gr.map(gName).join(', '):(fd.has('m')?'Bare medlemmer':'Alle');
+      const tid=g('timeSel')==='__annet'?g('time'):g('timeSel'),sted=g('placeSel')==='__annet'?g('place'):g('placeSel');
+      L.push(rad('Tittel',g('title')),rad('Kategori',g('cat')),rad('Hvem',hvem),rad('Når',g('start')+(g('end')?' – '+g('end'):'')+(tid?' kl. '+tid:'')),rad('Sted',sted),rad('Taler/hvem',g('who')),rad('Beskrivelse',g('text')))}
+    else{const tid=g('timeSel')==='__annet'?g('time'):g('timeSel');L.push(rad('Tittel',g('title')),rad('Kategori',g('cat')),rad('Når','Hver '+DAYS[+g('day')]+(tid?' kl. '+tid:'')),rad('Merknad',g('note')))}
+    $('#wizSum').innerHTML=L.join('')};
+  const show=i=>{cur=i;f.querySelectorAll('.wizs').forEach(e=>e.style.display=(+e.dataset.i===i)?'grid':'none');
+    $('#wizN').textContent='Steg '+(i+1)+' av '+n;$('#wizBar').style.width=((i+1)/n*100)+'%';
+    $('#wizBack').style.display=i?'':'none';$('#wizNext').style.display=i<n-1?'':'none';$('#wizGo').style.display=i===n-1?'':'none';$('#wizGo').disabled=i!==n-1;
+    if(steps[i].sum)summary();state.msg='';$('#pubMsg').textContent=''};
+  const feil=m=>{state.msg=m;$('#pubMsg').textContent=m};
+  const ok=()=>{
+    const els=[...stepEl(cur).querySelectorAll('input,select,textarea')];
+    for(const el of els){if(el.hidden||!el.willValidate)continue;if(!el.checkValidity()){el.reportValidity();return false}}
+    if(t==='events'&&cur===1&&!state.admin&&!f.querySelector('[name=groups]:checked')){feil('Velg minst én av gruppene du leder.');return false}
+    if(t==='regular'&&cur===1){const tid=f.elements.timeSel&&f.elements.timeSel.value==='__annet'?f.elements.time.value:(f.elements.timeSel?f.elements.timeSel.value:'');if(!tid){feil('Velg eller skriv inn klokkeslett.');return false}}
+    return true};
+  $('#wizNext').addEventListener('click',()=>{if(ok())show(cur+1)});
+  $('#wizBack').addEventListener('click',()=>show(cur-1));
+  f.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.tagName!=='TEXTAREA'){e.preventDefault();if(cur<n-1&&ok())show(cur+1)}});
+  show(0);
+}
 function pubAsk(){
   if(document.querySelector('dialog.pub'))return;
   state.adm={type:'posts',edit:null,form:false};state.msg='';
