@@ -515,7 +515,7 @@ function badge(){
 const viewBanner=()=>'';
 function render(){drawTabs();$('#view').innerHTML=viewBanner()+VIEWS[state.tab]();badge();window.scrollTo(0,0)}
 let pt;
-function push(t,b){$('#pushT').textContent=t;$('#pushB').textContent=b;$('#push').classList.add('show');clearTimeout(pt);pt=setTimeout(()=>$('#push').classList.remove('show'),/^Kunne ikke/.test(t)?4000:2000)}
+function push(t,b){$('#pushT').textContent=t;$('#pushB').textContent=b;$('#push').classList.add('show');clearTimeout(pt);pt=setTimeout(()=>$('#push').classList.remove('show'),4000)}
 $('#push').addEventListener('click',()=>$('#push').classList.remove('show'));
 function keep(fn){const y=scrollY;fn();$('#view').innerHTML=viewBanner()+VIEWS[state.tab]();drawTabs();badge();window.scrollTo(0,y)}
 async function refresh(){await load();keep(()=>{})}
