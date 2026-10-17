@@ -129,6 +129,8 @@ nav.tabs button[aria-current="page"]{color:var(--brand)}
 nav.tabs svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #push{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translate(-50%,-160%);width:calc(100% - 24px);max-width:440px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-left:6px solid var(--lamp);border-radius:8px 18px 18px 8px;padding:16px 18px;box-shadow:0 14px 40px rgba(0,0,0,.35),0 2px 8px rgba(0,0,0,.2);z-index:20;transition:transform .4s cubic-bezier(.2,.9,.3,1.2);display:flex;gap:14px;align-items:center;cursor:pointer}
 #push.show{transform:translate(-50%,0)}
+#push{touch-action:none}
+#push.drag{transition:none}
 #push .logo-mark{width:34px;height:42px;flex:none}
 #push b{display:block;font-size:17px;line-height:1.25}
 #push span{display:block;font-size:15px;color:var(--ink);opacity:.85;margin-top:2px}
@@ -516,7 +518,15 @@ const viewBanner=()=>'';
 function render(){drawTabs();$('#view').innerHTML=viewBanner()+VIEWS[state.tab]();badge();window.scrollTo(0,0)}
 let pt;
 function push(t,b){$('#pushT').textContent=t;$('#pushB').textContent=b;$('#push').classList.add('show');clearTimeout(pt);pt=setTimeout(()=>$('#push').classList.remove('show'),5000)}
-$('#push').addEventListener('click',()=>$('#push').classList.remove('show'));
+/* Meldingsboksen kan sveipes bort (opp eller til siden) eller trykkes bort. */
+{const pb=$('#push');let sx=0,sy=0,dx=0,dy=0,on=false,moved=false;
+  const hide=()=>{pb.classList.remove('drag','show');pb.style.transform='';pb.style.opacity=''};
+  pb.addEventListener('pointerdown',e=>{on=true;moved=false;sx=e.clientX;sy=e.clientY;dx=dy=0;pb.classList.add('drag');try{pb.setPointerCapture(e.pointerId)}catch(x){}clearTimeout(pt)});
+  pb.addEventListener('pointermove',e=>{if(!on)return;dx=e.clientX-sx;dy=Math.min(0,e.clientY-sy);if(Math.abs(dx)>8||dy<-8)moved=true;pb.style.transform='translate(calc(-50% + '+dx+'px),'+dy+'px)';pb.style.opacity=String(Math.max(.2,1-Math.max(Math.abs(dx)/200,-dy/80)))});
+  const end=()=>{if(!on)return;on=false;
+    if(Math.abs(dx)>70||dy<-35){pb.classList.remove('drag');pb.style.transition='transform .2s,opacity .2s';pb.style.transform='translate(calc(-50% + '+(Math.abs(dx)>70?(dx>0?400:-400):0)+'px),'+(Math.abs(dx)>70?0:-160)+'px)';pb.style.opacity='0';setTimeout(()=>{pb.style.transition='';hide()},220)}
+    else{pb.classList.remove('drag');pb.style.transform='';pb.style.opacity='';if(!moved)hide();else pt=setTimeout(hide,2500)}};
+  pb.addEventListener('pointerup',end);pb.addEventListener('pointercancel',end)}
 function keep(fn){const y=scrollY;fn();$('#view').innerHTML=viewBanner()+VIEWS[state.tab]();drawTabs();badge();window.scrollTo(0,y)}
 async function refresh(){await load();keep(()=>{})}
 const authMsg=c=>({'auth/invalid-credential':'Feil e-post eller passord.','auth/invalid-email':'Ugyldig e-postadresse.','auth/user-disabled':'Brukeren er sperret.','auth/too-many-requests':'For mange forsøk. Vent litt og prøv igjen.','auth/network-request-failed':'Ingen nettforbindelse.','auth/weak-password':'Passordet er for svakt. Bruk minst 8 tegn.','auth/requires-recent-login':'Logg ut og inn igjen, og prøv på nytt.'}[c]||'Noe gikk galt. Prøv igjen.');
