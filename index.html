@@ -199,7 +199,7 @@ function evItem(e){
   const open=state.open[e.id],r=state.rsvp[e.id];
   return `<div class="item ${open?'open':''}"><button data-ev="${e.id}" aria-expanded="${!!open}">${dateBox(e)}
    <div class="grow"><b>${e.t}</b><span class="small">${when(e.w)} ${tm(e)}${e.place?' · '+esc(e.place):''}${e.groups&&e.groups.length?' · '+esc(e.groups.map(gName).join(', ')):''}</span></div>
-   ${e.m?'<span class="tag m">Medlem</span>':`<span class="tag">${esc(e.cat)}</span>`}</button>
+   ${e.m?'<span class="tag m">Medlem</span>':`<span class="tag">${esc(normCat(e.cat))}</span>`}</button>
    <div class="detail"><div>${e.d}</div><div class="small">${esc(e.who)}</div>
    <div class="btns"><button class="btn ${r?'on':''}" data-rsvp="${e.id}">${r?'✓ Jeg kommer':'Jeg kommer'}</button>
    </div>${cnt(e.id)}</div></div>`}
@@ -249,8 +249,8 @@ function home(){
   <div class="card"><h2>Finn frem</h2><p class="small" style="margin:6px 0 0">Adresse: Kometvegen 7, 6419 Molde<br>Kontortid: tirsdag–torsdag kl. 10–16<br>Telefon: <a href="tel:+4771251029">71 25 10 29</a><br>E-post: <a href="mailto:post@sionmolde.no">post@sionmolde.no</a></p></div>`}
 
 function prog(){
-  const cats=['Alle','Møter','Happeninger','Ungdom'];
-  const list=events.filter(e=>state.filter==='Alle'||e.cat===state.filter);
+  const cats=['Alle',...CATS];
+  const list=events.filter(e=>state.filter==='Alle'||normCat(e.cat)===state.filter);
   let last='',out='';
   list.forEach(e=>{const k=when(e.w)+' '+e.w.getDate()+'. '+MON[e.w.getMonth()]+(e.w.getFullYear()!==now.getFullYear()?' '+e.w.getFullYear():'');
     if(k!==last){out+=`<div class="day">${k}</div>`;last=k}out+=evItem(e)});
@@ -258,7 +258,7 @@ function prog(){
   <div class="list">${out||'<p class="small">Ingen oppføringer her ennå.</p>'}</div>${regList()}`}
 
 function regList(){
-  const l=regular.filter(r=>state.filter==='Alle'||r.cat===state.filter);
+  const l=regular.filter(r=>state.filter==='Alle'||normCat(r.cat)===state.filter);
   if(!l.length)return '';
   return `<div><h2 style="margin-bottom:10px">Faste samlinger</h2><div class="card reg">${l.map(r=>`<div class="r"><div class="d">${cap(DAYS[r.day])}<span>kl. ${esc(r.time)}</span></div><div class="grow"><b>${esc(r.title)}</b>${r.note?`<span class="small">${esc(r.note)}</span>`:''}</div></div>`).join('')}</div></div>`}
 
@@ -269,7 +269,8 @@ function news(){
   return `<h1>Nyheter</h1><div class="list">${l||'<p class="small">Ingen nyheter ennå.</p>'}</div>`}
 
 /* ---------- Innlogging og administrasjon ---------- */
-const CATS=['Møter','Happeninger','Ungdom'];
+const CATS=['Møte','Samling','Ledersamling','Menighetsmøte','Happeninger','Ungdom'];
+const normCat=c=>c==='Møter'?'Møte':c;   // eldre arrangementer og faste samlinger bruker «Møter»
 /* Grupper i menigheten: [id, navn, forklaring]. Samme id-er står i varsel-script.gs. Brukere plasseres i grupper under Brukere. */
 const GROUPS=[['sondagsskole','Søndagsskole','barnearbeid'],['activ8','Activ8','ungdom'],['hangout','Hangout','unge voksne'],['debora','Debora','kvinnearbeid'],['cdur','Sion C-dur','mannsfellesskap'],['kjokken','Kjøkken',''],['torsdagsgruppa','Torsdagsgruppa',''],['vertskap','Vertskap',''],['lederradet','Lederrådet',''],['ungdomsledere','Ungdomsledere',''],['sommerstevne','Sommerstevne','']];
 const GR_IDS=GROUPS.map(g=>g[0]);
@@ -298,7 +299,7 @@ function fields(t,ed){return FIELDS[t].filter(f=>f[0]!=='push'||(PUSH_URL&&!ed))
     const tips=isAud?'Velger du ingenting, blir nyheten åpen for alle. «Bare medlemmer» krever innlogging. Velger du grupper, er det bare medlemmer i de gruppene (og administratorer) som ser nyheten.':'Velger du ingen grupper, gjelder arrangementet alle.';
     return `<fieldset class="f" style="border:0;padding:0;margin:0"><legend style="font-weight:600;font-size:14px;margin-bottom:4px">${l}</legend>${o.map(x=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="${k}" value="${x}" style="width:22px;height:22px;flex:none" ${cur.includes(x)?'checked':''}>${esc(nm(x))}</label>`).join('')}<span class="small">${tips}</span></fieldset>`}
   if(b==='area')return `<label class="f">${l}<textarea name="${k}" rows="3" ${req?'required':''}>${esc(v)}</textarea></label>`;
-  if(b==='sel')return `<label class="f">${l}<select name="${k}">${o.map(x=>`<option value="${x}" ${String(v==null?o[0]:v)===String(x)?'selected':''}>${k==='day'?cap(DAYS[x]):x}</option>`).join('')}</select></label>`;
+  if(b==='sel')return `<label class="f">${l}<select name="${k}">${o.map(x=>`<option value="${x}" ${String(v==null?o[0]:(k==='cat'?normCat(v):v))===String(x)?'selected':''}>${k==='day'?cap(DAYS[x]):x}</option>`).join('')}</select></label>`;
   if(b==='chk')return `<label class="f" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="${k}" style="width:auto" ${v?'checked':''}>${l}</label>`;
   return `<label class="f">${l}<input name="${k}" type="${b}" ${req?'required':''} value="${esc(v)}"></label>`}).join('')}
 function admItems(t){return t==='events'?rawEvents.slice().sort((a,b)=>a.start<b.start?-1:1):t==='posts'?posts:regular}
