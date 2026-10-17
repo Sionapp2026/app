@@ -77,9 +77,22 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
     // Medlemslisten: e-postadressen er dokument-ID. Brukeren kan sjekke sin egen adresse, administratorer styrer listen.
+    // Gruppeledere kan se medlemslisten (for å styre sine grupper), legge nye medlemmer inn i egne grupper, og bare endre feltet groups
+    // på eksisterende medlemmer: de kan bare legge til eller fjerne grupper de selv leder.
     match /members/{email} {
-      allow get: if signedIn() && request.auth.token.email == email || isAdmin();
-      allow list, write: if isAdmin();
+      allow get: if signedIn() && request.auth.token.email == email || isAdmin() || isLeader();
+      allow list: if isAdmin() || isLeader();
+      allow write: if isAdmin();
+      allow create: if isLeader()
+        && request.resource.data.keys().hasOnly(['email', 'rolle', 'created', 'by', 'groups'])
+        && request.resource.data.email == email
+        && request.resource.data.groups is list && request.resource.data.groups.size() > 0
+        && request.resource.data.groups.hasOnly(myLeads());
+      allow update: if isLeader()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['groups'])
+        && request.resource.data.groups is list
+        && request.resource.data.groups.toSet().difference(resource.data.get('groups', []).toSet()).hasOnly(myLeads())
+        && resource.data.get('groups', []).toSet().difference(request.resource.data.groups.toSet()).hasOnly(myLeads());
     }
     // Administratorer er dokumenter i admins, med e-postadressen som dokument-ID. Bare administratorer kan endre listen.
     match /admins/{email} {

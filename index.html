@@ -170,7 +170,7 @@ $('#today').textContent=cap(DAYS[now.getDay()])+' '+now.getDate()+'. '+MON[now.g
 /* Innhold hentes fra Firebase (Firestore). Hvis databasen er tom eller utilgjengelig, brukes
    JSON-filene i data/ som reserve. Innlogging og adminskjema bruker Firebase Authentication. */
 let FB=null,usingFb=false;
-let events=[],posts=[],regular=[],rawEvents=[],members=[],counts={};
+let events=[],posts=[],regular=[],rawEvents=[],members=[],leaderMem=[],counts={};
 const todayStart=new Date(now);todayStart.setHours(0,0,0,0);
 let seen=0;try{seen=+localStorage.getItem('sm-seen')||0}catch(e){}
 const markSeen=()=>{seen=Date.now();try{localStorage.setItem('sm-seen',String(seen))}catch(e){}posts.forEach(p=>p.read=true);state.unread=0};
@@ -197,6 +197,7 @@ async function load(){
   regular=g.filter(r=>canSeeCat(r.cat)&&visOK(r)).sort((a,b)=>((a.day+6)%7-(b.day+6)%7)||String(a.time).localeCompare(String(b.time)));
   counts=usingFb&&FB?await FB.counts().catch(()=>({})):{};
   members=state.admin&&FB?await FB.listUsers().catch(()=>[]):[];
+  leaderMem=isLeader()&&FB?await FB.leaderMembers(state.leads).catch(()=>[]):[];
   state.unread=posts.filter(isNew).length;
 }
 function ago(p){
@@ -440,6 +441,14 @@ const userRow=(x,me)=>{
    ${adm?'':`<details ${state.ulOpen===x.id?'open':''} style="flex-basis:100%"><summary class="small" style="cursor:pointer">Leder for (${(x.leads||[]).length})${(x.leads||[]).length?': '+esc((x.leads||[]).map(gName).join(', ')):''}</summary><div class="small" style="margin:4px 0">Kan publisere nyheter, arrangementer og varsler, men bare til gruppene som er avkrysset. Personen legges også inn i gruppen.</div><div style="display:grid;gap:6px;margin:6px 0">${GROUPS.map(g=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-ul="${esc(x.id)}" data-gid="${g[0]}" style="width:22px;height:22px;flex:none" ${(x.leads||[]).includes(g[0])?'checked':''}>${esc(gLabel(g[0]))}</label>`).join('')}</div></details>`}
    <div class="btns"><button class="btn" data-memreset="${esc(x.id)}">Nytt passord</button>${adm||self?'':`<button class="btn" data-ledertoggle="${esc(x.id)}" data-on="${x.leder?'0':'1'}">${x.leder?'Fjern lederrolle':'Gjør til leder'}</button>`}${self?'':`<button class="btn" data-memrole="${esc(x.id)}" data-to="${adm?'member':'admin'}">${adm?'Gjør til medlem':'Gjør til admin'}</button><button class="btn" data-memdel="${esc(x.id)}">Fjern</button>`}</div></div>`};
 
+/* Gruppeleder: se, legge til og fjerne medlemmer i gruppene en leder. */
+function leaderGroups(){
+  return `<details class="card acc" data-acc="mingr" ${state.acc.mingr?'open':''}><summary><h2>Mine grupper</h2></summary>
+  <p class="small" style="margin:0 0 8px">Legg til og fjern medlemmer i gruppene du leder. En ny person får en e-post for å velge passord. Å fjerne tar bare personen ut av gruppen, ikke ut av appen.</p>
+  <p class="small" role="status" style="margin:0 0 6px">${esc(state.lgMsg||'')}</p>
+  ${(state.leads||[]).map(g=>{const l=leaderMem.filter(u=>u.groups.includes(g));return `<details class="acc sub" data-acc="mg_${g}" ${state.acc['mg_'+g]?'open':''}><summary><h3 style="font-size:19px">${esc(gName(g))} (${l.length})</h3></summary>
+   <form class="form" data-lgform="${esc(g)}" style="margin:0 0 10px;padding:10px;background:var(--bg);border-radius:10px"><label class="f">E-post til ny person<input type="email" required autocomplete="off"></label><button class="btn primary" type="submit">Legg til i ${esc(gName(g))}</button></form>
+   <div class="reg">${l.map(u=>`<div class="r"><div class="grow">${esc(u.id)}</div><button class="btn" data-lgdel="${esc(u.id)}|${esc(g)}">Fjern</button></div>`).join('')||'<p class="small">Ingen ennå.</p>'}</div></details>`}).join('')}</details>`}
 /* Grupper: opprett, endre navn og slett. Første endring lagrer standardgruppene i databasen. */
 const slug=n=>String(n).toLowerCase().replace(/æ/g,'ae').replace(/ø/g,'o').replace(/å/g,'a').replace(/[^a-z0-9]+/g,'').slice(0,30)||'gruppe';
 function groupsCard(){
@@ -579,7 +588,7 @@ function me(){
   return `<h1>Meg</h1>${loginCard()}
   ${pushCard()}
 
-  ${state.view!=='meg'?'':state.admin?memberCard()+groupsCard()+snapCard():isLeader()?admin():''}`}
+  ${state.view!=='meg'?'':state.admin?memberCard()+groupsCard()+snapCard():isLeader()?leaderGroups()+admin():''}`}
 
 const VIEWS={home,prog,news,me};
 const SUN='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
@@ -719,6 +728,9 @@ document.addEventListener('click',async e=>{
     try{await FB.reset(m);keep(()=>state.err='Hvis adressen er registrert, er en lenke for nytt passord sendt.')}catch(er){keep(()=>state.err=authMsg(er.code))}}
   else if(c.dataset.at){keep(()=>{state.adm={type:c.dataset.at,edit:null,form:false};state.msg='';state.sel={}})}
   else if(c.dataset.aedit){editAsk(state.adm.type,c.dataset.aedit)}
+  else if(c.dataset.lgdel){const [em,g]=c.dataset.lgdel.split('|');if(!confirm('Fjerne '+em+' fra '+gName(g)+'?'))return;
+    try{await FB.leaderRemove(em,g);state.lgMsg=em+' er fjernet fra '+gName(g)+'.';state.acc['mg_'+g]=true;state.acc.mingr=true}catch(er){state.lgMsg=saveMsg(er.code)}
+    await refresh()}
   else if('pubnew' in c.dataset){pubAsk()}
   else if('grpnew' in c.dataset){grpAsk(null)}
   else if(c.dataset.grpedit){grpAsk(c.dataset.grpedit)}
@@ -762,6 +774,12 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('submit',async e=>{
   const f=e.target;
+  if(f.dataset&&f.dataset.lgform){e.preventDefault();
+    const g=f.dataset.lgform,m=f.querySelector('input').value.trim().toLowerCase();
+    if(!(state.leads||[]).includes(g))return;
+    try{const r=await FB.leaderAdd(m,g);state.lgMsg=m+(r.created?' er lagt til som medlem i '+gName(g)+(r.account?' og har fått en e-post for å velge passord.':'.'):' er lagt til i '+gName(g)+'.');state.acc['mg_'+g]=true;state.acc.mingr=true}
+    catch(er){state.lgMsg=er.code==='auth/invalid-email'?'Ugyldig e-postadresse.':er.code==='auth/admin-restricted-operation'?'Registrering er slått av i Firebase.':saveMsg(er.code)}
+    await refresh();return}
   if(f.id==='login'){e.preventDefault();
     try{const em=$('#lE').value.trim(),pw=$('#lP').value;await FB.login(em,pw);state.err='';
       try{if(window.PasswordCredential)await navigator.credentials.store(new PasswordCredential({id:em,password:pw,name:em}))}catch(x){}}catch(er){keep(()=>state.err=authMsg(er.code))}}

@@ -197,6 +197,23 @@ try{
       const [m,a]=await Promise.all([S.getDocs(S.collection(db,'members')),S.getDocs(S.collection(db,'admins'))]);
       return a.docs.map(d=>({id:d.id,role:'admin',groups:d.data().groups||[],leads:[]})).concat(m.docs.map(d=>({id:d.id,role:'member',groups:d.data().groups||[],leads:d.data().leads||[],leder:d.data().leder===true}))).sort((x,y)=>x.id<y.id?-1:1);
     },
+    // Gruppeleder: medlemmer i egne grupper, legge til (oppretter kontoen hvis personen er ny) og fjerne fra en gruppe.
+    async leaderMembers(leads){const s=await S.getDocs(S.collection(db,'members'));return s.docs.map(d=>({id:d.id,groups:d.data().groups||[]})).filter(u=>u.groups.some(g=>leads.includes(g))).sort((a,b)=>a.id<b.id?-1:1)},
+    async leaderAdd(email,group){
+      const ref=S.doc(db,'members',email),s=await S.getDoc(ref);
+      if(s.exists()){const g=new Set(s.data().groups||[]);g.add(group);await S.updateDoc(ref,{groups:[...g]});return {created:false}}
+      await S.setDoc(ref,{email,rolle:'medlem',created:S.serverTimestamp(),by:auth.currentUser.email,groups:[group]});
+      const pw=Array.from(crypto.getRandomValues(new Uint8Array(24)),b=>'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'[b%56]).join('');
+      let created=true;
+      try{await A.createUserWithEmailAndPassword(secAuth,email,pw);await A.signOut(secAuth)}
+      catch(e){if(e.code==='auth/email-already-in-use')created=false;else throw e}
+      if(created)await A.sendPasswordResetEmail(auth,email);
+      return {created:true,account:created}
+    },
+    async leaderRemove(email,group){
+      const ref=S.doc(db,'members',email),s=await S.getDoc(ref);if(!s.exists())return;
+      await S.updateDoc(ref,{groups:(s.data().groups||[]).filter(g=>g!==group)});
+    },
     // Legger adressen i riktig liste, oppretter kontoen med et tilfeldig passord og sender en e-post der brukeren velger passord selv.
     async addUser(email,role){
       await S.setDoc(S.doc(db,role==='admin'?'admins':'members',email),{email,rolle:role==='admin'?'admin':'medlem',created:S.serverTimestamp(),by:auth.currentUser.email});
