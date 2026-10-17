@@ -42,6 +42,10 @@ try{
     set:(col,id,data)=>S.setDoc(S.doc(db,col,id),data,{merge:true}),
     // Unntak for enkeltdatoer på en fast samling (avlyst / fjernet / endret). Hele ex-feltet byttes ut.
     setFastEx:(id,ex)=>S.updateDoc(S.doc(db,'regular',id),{ex}),
+    // Grupper (samlingen groups): navn og beskrivelse. Appen bruker innebygde standardgrupper til administrator redigerer første gang.
+    async groupsList(){const s=await S.getDocs(S.collection(db,'groups'));return s.docs.map(d=>({id:d.id,...d.data()}))},
+    setGroupDoc:(id,d)=>S.setDoc(S.doc(db,'groups',id),d,{merge:true}),
+    delGroupDoc:id=>S.deleteDoc(S.doc(db,'groups',id)),
     del:(col,id)=>S.deleteDoc(S.doc(db,col,id)),
     // «Jeg kommer»: en anonym teller per arrangement. Ingen navn lagres, bare antallet.
     async counts(){const snap=await S.getDocs(S.collection(db,'rsvpCounts'));const o={};snap.docs.forEach(d=>o[d.id]=d.data().n||0);return o},

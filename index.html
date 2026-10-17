@@ -187,6 +187,7 @@ async function fetchAll(){
   return Promise.all([getJson('events'),getJson('posts'),getJson('regular').catch(()=>[])]);
 }
 async function load(){
+  if(FB)try{applyGroups(await FB.groupsList())}catch(e){}
   const [e,p,g]=await fetchAll();
   rawEvents=e;
   events=e.filter(x=>canSee(x)&&canSeeCat(x.cat)).map(x=>({...x,t:esc(x.title),d:esc(x.text),w:new Date(x.start+'T'+(x.time||'00:00')),e:x.end?new Date(x.end+'T23:59'):null}))
@@ -364,8 +365,14 @@ function setView(v){
   else state.view=v}
 const canPreview=()=>state.real!==null||state.admin||state.leder===true||(state.leads||[]).length>0;   // eldre arrangementer og faste samlinger bruker «Møter»
 /* Grupper i menigheten: [id, navn, forklaring]. Samme id-er står i varsel-script.gs. Brukere plasseres i grupper under Brukere. */
-const GROUPS=[['sondagsskole','Søndagsskole','barnearbeid'],['activ8','Activ8','ungdom'],['hangout','Hangout','unge voksne'],['debora','Debora','kvinnearbeid'],['cdur','Sion C-dur','mannsfellesskap'],['kjokken','Kjøkken',''],['torsdagsgruppa','Torsdagsgruppa',''],['vertskap','Vertskap',''],['lederradet','Lederrådet',''],['ungdomsledere','Ungdomsledere',''],['sommerstevne','Sommerstevne',''],['elevate','Elevate',''],['lovsang','Lovsangsteamet','']];
+const GROUPS_DEFAULT=[['sondagsskole','Søndagsskole','barnearbeid'],['activ8','Activ8','ungdom'],['hangout','Hangout','unge voksne'],['debora','Debora','kvinnearbeid'],['cdur','Sion C-dur','mannsfellesskap'],['kjokken','Kjøkken',''],['torsdagsgruppa','Torsdagsgruppa',''],['vertskap','Vertskap',''],['lederradet','Lederrådet',''],['ungdomsledere','Ungdomsledere',''],['sommerstevne','Sommerstevne',''],['elevate','Elevate',''],['lovsang','Lovsangsteamet','']];
+/* Grupper: standardgruppene (over) til administrator redigerer første gang. Da lagres alle i databasen (samlingen groups) og listen leses derfra. GROUPS og GR_IDS endres på stedet, så alle som bruker dem får den nye listen. */
+const GROUPS=GROUPS_DEFAULT.map(g=>g.slice());
 const GR_IDS=GROUPS.map(g=>g[0]);
+function applyGroups(l){
+  const src=l&&l.length?l.slice().sort((a,b)=>((a.ord==null?999:a.ord)-(b.ord==null?999:b.ord))||String(a.name).localeCompare(String(b.name))).map(g=>[g.id,g.name,g.desc||'']):GROUPS_DEFAULT.map(g=>g.slice());
+  GROUPS.length=0;src.forEach(g=>GROUPS.push(g));GR_IDS.length=0;GROUPS.forEach(g=>GR_IDS.push(g[0]));state.grDb=!!(l&&l.length)}
+
 const gName=id=>{const g=GROUPS.find(x=>x[0]===id);return g?g[1]:id};
 const gLabel=id=>{const g=GROUPS.find(x=>x[0]===id);return g?g[1]+(g[2]?' ('+g[2]+')':''):id};
 /* Innhold med grupper vises bare for administratorer og medlemmer i minst én av gruppene. Dette er en visning i appen; sikkerheten for «bare medlemmer» ligger i databasen. */
@@ -393,7 +400,7 @@ function fields(t,ed,only){return FIELDS[t].filter(f=>(!only||only.includes(f[0]
     const cur=ed?(ed[k]&&ed[k].length?ed[k]:(isAud&&state.admin?[ed.tag||'Alle']:[])):(isAud?(state.admin?['Alle']:myGroupOptions().length===1?myGroupOptions():[]):[]);
     const nm=x=>x==='Alle'?'Alle (åpen for alle)':x==='Medlem'?'Bare medlemmer (innloggede)':gLabel(x);
     const tips=!state.admin?'Velg minst én av gruppene du leder. Bare medlemmer i gruppene og administratorer ser innholdet.':isAud?'Velger du ingenting, blir nyheten åpen for alle. «Bare medlemmer» krever innlogging. Velger du grupper, er det bare medlemmer i de gruppene (og administratorer) som ser nyheten.':'Velger du ingen grupper, gjelder arrangementet alle.';
-    return `<fieldset class="f" style="border:0;padding:0;margin:0"><legend style="font-weight:600;font-size:14px;margin-bottom:4px">${l}</legend>${(state.admin?o:myGroupOptions()).map(x=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="${k}" value="${x}" style="width:22px;height:22px;flex:none" ${cur.includes(x)?'checked':''}>${esc(nm(x))}</label>`).join('')}<span class="small">${tips}</span></fieldset>`}
+    return `<fieldset class="f" style="border:0;padding:0;margin:0"><legend style="font-weight:600;font-size:14px;margin-bottom:4px">${l}</legend>${(state.admin?(isAud?['Alle','Medlem',...GR_IDS]:GR_IDS):myGroupOptions()).map(x=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="${k}" value="${x}" style="width:22px;height:22px;flex:none" ${cur.includes(x)?'checked':''}>${esc(nm(x))}</label>`).join('')}<span class="small">${tips}</span></fieldset>`}
   if(b==='area')return `<label class="f">${l}<textarea name="${k}" rows="3" ${req?'required':''}>${esc(v)}</textarea></label>`;
   if(b==='sel')return `<label class="f">${l}<select name="${k}">${(k==='cat'?allCats():o).map(x=>`<option value="${x}" ${String(v==null?o[0]:(k==='cat'?normCat(v):v))===String(x)?'selected':''}>${k==='day'?cap(DAYS[x]):x}</option>`).join('')}</select></label>`;
   if(b==='chk')return `<label class="f" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="${k}" style="width:auto" ${v?'checked':''}>${l}</label>`;
@@ -426,6 +433,57 @@ const userRow=(x,me)=>{
    ${adm?'':`<details ${state.ulOpen===x.id?'open':''} style="flex-basis:100%"><summary class="small" style="cursor:pointer">Leder for (${(x.leads||[]).length})${(x.leads||[]).length?': '+esc((x.leads||[]).map(gName).join(', ')):''}</summary><div class="small" style="margin:4px 0">Kan publisere nyheter, arrangementer og varsler, men bare til gruppene som er avkrysset. Personen legges også inn i gruppen.</div><div style="display:grid;gap:6px;margin:6px 0">${GROUPS.map(g=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400;font-size:14px"><input type="checkbox" data-ul="${esc(x.id)}" data-gid="${g[0]}" style="width:22px;height:22px;flex:none" ${(x.leads||[]).includes(g[0])?'checked':''}>${esc(gLabel(g[0]))}</label>`).join('')}</div></details>`}
    <div class="btns"><button class="btn" data-memreset="${esc(x.id)}">Nytt passord</button>${adm||self?'':`<button class="btn" data-ledertoggle="${esc(x.id)}" data-on="${x.leder?'0':'1'}">${x.leder?'Fjern lederrolle':'Gjør til leder'}</button>`}${self?'':`<button class="btn" data-memrole="${esc(x.id)}" data-to="${adm?'member':'admin'}">${adm?'Gjør til medlem':'Gjør til admin'}</button><button class="btn" data-memdel="${esc(x.id)}">Fjern</button>`}</div></div>`};
 
+/* Grupper: opprett, endre navn og slett. Første endring lagrer standardgruppene i databasen. */
+const slug=n=>String(n).toLowerCase().replace(/æ/g,'ae').replace(/ø/g,'o').replace(/å/g,'a').replace(/[^a-z0-9]+/g,'').slice(0,30)||'gruppe';
+function groupsCard(){
+  return `<details class="card acc" data-acc="grupper" ${state.acc.grupper?'open':''}><summary><h3>Grupper (${GROUPS.length})</h3></summary>
+  <p class="small" style="margin:0 0 8px">Grupper brukes til å velge hvem som ser et arrangement eller en nyhet, og hvem en gruppeleder leder. Endrer du navnet, gjelder det overalt. Sletter du en gruppe, tas den ut av alle brukere, og innhold som bare var for gruppen blir «Bare medlemmer».</p>
+  <button class="btn primary" data-grpnew style="width:auto">+ Ny gruppe</button>
+  <div class="reg" style="margin-top:10px">${GROUPS.map(g=>`<div class="r"><div class="grow">${esc(g[1])}${g[2]?' <span class="small">('+esc(g[2])+')</span>':''}</div><button class="btn" data-grpedit="${esc(g[0])}">Endre</button><button class="btn" data-grpdel="${esc(g[0])}">Slett</button></div>`).join('')}</div></details>`}
+async function grpSeed(){
+  if(state.grDb)return;
+  let i=0;for(const g of GROUPS_DEFAULT){await FB.setGroupDoc(g[0],{name:g[1],desc:g[2]||'',ord:i++})}
+  applyGroups(await FB.groupsList())}
+function grpAsk(id){
+  if(!FB)return;
+  const g=id?GROUPS.find(x=>x[0]===id):null,dlg=document.createElement('dialog');dlg.className='lp';
+  dlg.innerHTML='<form class="form" method="dialog"><h3 style="margin:0">'+(g?'Endre gruppe':'Ny gruppe')+'</h3><label class="f">Navn<input id="gN" maxlength="40" value="'+esc(g?g[1]:'')+'"></label><label class="f">Beskrivelse (valgfritt)<input id="gD" maxlength="40" placeholder="for eksempel ungdom" value="'+esc(g?g[2]:'')+'"></label><p class="small" role="status" id="gMsg" style="margin:0"></p><div class="btns"><button class="btn primary" value="lagre" style="width:auto">Lagre</button><button class="btn" value="avbryt" formnovalidate>Avbryt</button></div></form>';
+  document.body.appendChild(dlg);
+  const f=dlg.querySelector('form');
+  f.addEventListener('submit',async e=>{
+    if(e.submitter&&e.submitter.value!=='lagre')return;
+    e.preventDefault();
+    const n=dlg.querySelector('#gN').value.trim().replace(/\s+/g,' '),d=dlg.querySelector('#gD').value.trim();
+    if(!n){dlg.querySelector('#gMsg').textContent='Skriv et navn.';return}
+    if(GROUPS.some(x=>x[0]!==id&&x[1].toLowerCase()===n.toLowerCase())){dlg.querySelector('#gMsg').textContent='Det finnes allerede en gruppe med dette navnet.';return}
+    try{
+      await grpSeed();
+      if(g)await FB.setGroupDoc(id,{name:n,desc:d});
+      else{let nid=slug(n),k=2;while(GR_IDS.includes(nid))nid=slug(n)+(k++);await FB.setGroupDoc(nid,{name:n,desc:d,ord:GROUPS.length})}
+      dlg.close();await refresh();push(g?'Gruppen er endret':'Gruppen er opprettet',n)}
+    catch(er){dlg.querySelector('#gMsg').textContent=saveMsg(er&&er.code)+' (Er de nye reglene publisert i Firebase?)'}});
+  dlg.addEventListener('close',()=>dlg.remove());
+  dlg.showModal();
+}
+function grpDel(id){
+  const g=GROUPS.find(x=>x[0]===id);if(!g||!FB)return;
+  const ev=rawEvents.filter(e=>(e.groups||[]).includes(id)),po=posts.filter(p=>(p.groups||[]).includes(id)),br=members.filter(u=>(u.groups||[]).includes(id)||(u.leads||[]).includes(id));
+  const dlg=document.createElement('dialog');dlg.className='lp';
+  dlg.innerHTML='<form class="form" method="dialog"><h3 style="margin:0">Slette gruppen «'+esc(g[1])+'»?</h3><p class="small" style="margin:0">Den brukes av '+ev.length+' arrangement'+(ev.length===1?'':'er')+', '+po.length+' nyhet'+(po.length===1?'':'er')+' og '+br.length+' bruker'+(br.length===1?'':'e')+'. Gruppen tas ut av dem. Innhold som bare var for denne gruppen blir «Bare medlemmer». Ingenting slettes ellers.</p><div class="btns col"><button class="btn danger" value="slett">Slett gruppen</button><button class="btn" value="avbryt">Avbryt</button></div></form>';
+  document.body.appendChild(dlg);
+  dlg.addEventListener('close',async()=>{const ok=dlg.returnValue==='slett';dlg.remove();if(!ok)return;
+    try{
+      try{await FB.ensureSnapshot('Før sletting av gruppe',5*60e3)}catch(er){if(!confirm('Kunne ikke lage et sikkerhetspunkt ('+((er&&er.code)||'feil')+'). Fortsette likevel?'))return}
+      await grpSeed();
+      const rest=GROUPS.filter(x=>x[0]!==id);
+      for(const e of ev)await FB.set('events',e.id,{groups:(e.groups||[]).filter(x=>x!==id)});
+      for(const p of po){const gs=(p.groups||[]).filter(x=>x!==id);await FB.set('posts',p.id,gs.length?{groups:gs,audience:gs,tag:gs.map(x=>(rest.find(r=>r[0]===x)||[x,x])[1]).join(' · '),m:true}:{groups:[],audience:['Medlem'],tag:'Medlem',m:true})}
+      for(const u of br){const gs=(u.groups||[]).filter(x=>x!==id),ls=(u.leads||[]).filter(x=>x!==id);
+        if(u.role==='admin')await FB.setGroups(u.id,'admin',gs);else if((u.leads||[]).includes(id))await FB.setLeads(u.id,ls,gs);else await FB.setGroups(u.id,'member',gs)}
+      await FB.delGroupDoc(id);await refresh();push('Gruppen er slettet','«'+g[1]+'» er fjernet.')}
+    catch(er){push('Kunne ikke slette',saveMsg(er&&er.code))}});
+  dlg.showModal();
+}
 function memberCard(){
   const me=state.user?state.user.email:'';
   const adms=members.filter(x=>x.role==='admin'),lds=members.filter(x=>x.role!=='admin'&&x.leder),leds=members.filter(x=>x.role!=='admin'&&!x.leder&&(x.leads||[]).length),meds=members.filter(x=>x.role!=='admin'&&!x.leder&&!(x.leads||[]).length);
@@ -514,7 +572,7 @@ function me(){
   return `<h1>Meg</h1>${loginCard()}
   ${pushCard()}
 
-  ${state.view!=='meg'?'':state.admin?memberCard()+snapCard():isLeader()?admin():''}`}
+  ${state.view!=='meg'?'':state.admin?memberCard()+groupsCard()+snapCard():isLeader()?admin():''}`}
 
 const VIEWS={home,prog,news,me};
 const SUN='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
@@ -655,6 +713,9 @@ document.addEventListener('click',async e=>{
   else if(c.dataset.at){keep(()=>{state.adm={type:c.dataset.at,edit:null,form:false};state.msg='';state.sel={}})}
   else if(c.dataset.aedit){editAsk(state.adm.type,c.dataset.aedit)}
   else if('pubnew' in c.dataset){pubAsk()}
+  else if('grpnew' in c.dataset){grpAsk(null)}
+  else if(c.dataset.grpedit){grpAsk(c.dataset.grpedit)}
+  else if(c.dataset.grpdel){grpDel(c.dataset.grpdel)}
   else if('wiz' in c.dataset){wizAsk()}
   else if('anew' in c.dataset){keep(()=>{state.adm.form=true;state.adm.edit=null;state.msg=''});setTimeout(()=>{const f=$('#adm');if(f)f.scrollIntoView({block:'start'})},60)}
   else if('acancel' in c.dataset){keep(()=>{state.adm.edit=null;state.adm.form=false;state.msg=''})}
