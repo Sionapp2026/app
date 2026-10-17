@@ -51,9 +51,18 @@ try{
       if(await Notification.requestPermission()!=='granted')throw {code:'push/denied'};
       const token=await M.getToken(M.getMessaging(app),{vapidKey:VAPID,serviceWorkerRegistration:reg});
       if(!token)throw {code:'push/no-token'};
-      await S.setDoc(S.doc(db,'pushTokens',token),{token,groups:[],created:S.serverTimestamp()});
+      // Er brukeren innlogget, kobles koden til e-posten. Da kan tjenesten sende til medlemmer og grupper. Besøkende får bare «alle»-varsler.
+      const ref=S.doc(db,'pushTokens',token);
+      try{await S.setDoc(ref,{token,groups:[],created:S.serverTimestamp(),...(auth.currentUser?{email:auth.currentUser.email.toLowerCase()}:{})})}
+      catch(e){   // reglene tillater kanskje ikke e-post ennå: lagre uten kobling, så «alle»-varsler fungerer
+        if(!auth.currentUser||e.code!=='permission-denied')throw e;
+        await S.setDoc(ref,{token,groups:[],created:S.serverTimestamp()});
+      }
       return token;
     },
+    // Kobler en eksisterende varselkode til innlogget bruker (etter innlogging), eller fjerner koblingen (før utlogging).
+    linkPush:token=>auth.currentUser?S.setDoc(S.doc(db,'pushTokens',token),{token,groups:[],created:S.serverTimestamp(),email:auth.currentUser.email.toLowerCase()}):Promise.resolve(),
+    unlinkPush:token=>S.setDoc(S.doc(db,'pushTokens',token),{token,groups:[],created:S.serverTimestamp()}),
     // Feiler høyt: kalleren beholder status og viser feil hvis abonnementet ikke faktisk ble fjernet.
     // Firebase trenger å vite hvilken service worker som eier abonnementet (reg) før koden kan slettes etter en sideinnlasting.
     // Mislykkes den vanlige slettingen, avslutter vi abonnementet direkte i nettleseren. Mislykkes begge, feiler vi høyt.
@@ -71,9 +80,9 @@ try{
       if(token)await S.deleteDoc(S.doc(db,'pushTokens',token));
     },
     // Sender varsel via Apps Script-tjenesten. Tjenesten sjekker innloggingsbeviset og at brukeren er administrator.
-    async sendPush(url,title,body,tab){
+    async sendPush(url,title,body,tab,mal){
       const idToken=await auth.currentUser.getIdToken(true);
-      const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({idToken,title,body,tab})});
+      const r=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({idToken,title,body,tab,mal})});
       return r.json();
     },
     // Sikkerhetskopi: henter alt innhold (også medlemsinnhold og brukerlister) som ren tekst. Bare administratorer får lov.
@@ -90,13 +99,20 @@ try{
     },
     // Varsel som kommer mens appen er åpen (da viser ikke nettleseren noe selv).
     onPush(cb){FB.pushSupported().then(ok=>{if(ok)M.onMessage(M.getMessaging(app),cb)})},
+    // Gruppene innlogget bruker tilhører (fra egen oppføring i members og admins).
+    async myGroups(email){
+      const ut=new Set();
+      for(const c of ['members','admins']){try{const s=await S.getDoc(S.doc(db,c,email));if(s.exists())(s.data().groups||[]).forEach(g=>ut.add(g))}catch(e){}}
+      return [...ut];
+    },
+    setGroups:(email,role,groups)=>S.updateDoc(S.doc(db,role==='admin'?'admins':'members',email),{groups}),
     async isMember(email){
       try{return (await S.getDoc(S.doc(db,'members',email))).exists()}catch(e){return false}
     },
     // Brukere = administratorer (samlingen admins) og medlemmer (samlingen members). Adressen er dokument-ID.
     async listUsers(){
       const [m,a]=await Promise.all([S.getDocs(S.collection(db,'members')),S.getDocs(S.collection(db,'admins'))]);
-      return a.docs.map(d=>({id:d.id,role:'admin'})).concat(m.docs.map(d=>({id:d.id,role:'member'}))).sort((x,y)=>x.id<y.id?-1:1);
+      return a.docs.map(d=>({id:d.id,role:'admin',groups:d.data().groups||[]})).concat(m.docs.map(d=>({id:d.id,role:'member',groups:d.data().groups||[]}))).sort((x,y)=>x.id<y.id?-1:1);
     },
     // Legger adressen i riktig liste, oppretter kontoen med et tilfeldig passord og sender en e-post der brukeren velger passord selv.
     async addUser(email,role){
