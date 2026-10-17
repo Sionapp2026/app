@@ -236,7 +236,7 @@ function svCard(){
   <p class="small" role="status" style="margin:8px 0 0">${esc(state.sv)}</p><p class="small" style="margin:6px 0 0">E-posten brukes bare til informasjon om sommerstevnet.</p></div>`}
 
 function home(){
-  const vis=events.filter(e=>!e.m||state.member), n=vis[0], wk=vis.slice(1,4);
+  const vis=events.filter(e=>(!e.m||state.member)&&!e.hideHome), n=vis[0], wk=vis.slice(1,4);
   const post=posts.filter(p=>!p.m||state.member)[0];
   return `<div><h1>Velkommen</h1><span class="script">dette skjer i Sion Molde</span></div>
   ${n?`<div class="card next"><div class="eyebrow">Neste samling</div><h2>${n.t}</h2>
@@ -273,7 +273,7 @@ const CATS=['Møter','Happeninger','Ungdom'];
 const PLACES=['Kometvegen 7','Åndalsnes','Eidsvåg','Eide','Tingvoll'],TIMES=['11:00','12:00','19:00'];
 /* [felt, etikett, type, valg, type på feltet for «Annet»]. Stjerne etter typen betyr obligatorisk. */
 const FIELDS={
- events:[['title','Tittel','text*'],['start','Startdato','date*'],['end','Sluttdato (bare for flere dager)','date'],['time','Klokkeslett','combo',TIMES,'time'],['place','Sted','combo',PLACES,'text'],['who','Taler eller hvem','text'],['text','Beskrivelse','area'],['cat','Kategori','sel',CATS],['m','Bare for medlemmer','chk']],
+ events:[['title','Tittel','text*'],['start','Startdato','date*'],['end','Sluttdato (bare for flere dager)','date'],['time','Klokkeslett','combo',TIMES,'time'],['place','Sted','combo',PLACES,'text'],['who','Taler eller hvem','text'],['text','Beskrivelse','area'],['cat','Kategori','sel',CATS],['m','Bare for medlemmer','chk'],['hideHome','Ikke vis på Hjem (vises fortsatt i Program)','chk']],
  posts:[['t','Tittel','text*'],['b','Melding','area*'],['tag','Målgruppe','sel',['Alle','Medlem','Ungdom']],['push','Send også som varsel til telefonene','chk']],
  regular:[['title','Tittel','text*'],['day','Ukedag','sel',[1,2,3,4,5,6,0]],['time','Klokkeslett','combo*',TIMES,'time'],['note','Merknad','text'],['cat','Kategori','sel',CATS]]};
 const COL={events:'events',posts:'posts',regular:'regular'};
@@ -287,7 +287,7 @@ function fields(t,ed){return FIELDS[t].filter(f=>f[0]!=='push'||(PUSH_URL&&!ed))
   if(b==='chk')return `<label class="f" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="${k}" style="width:auto" ${v?'checked':''}>${l}</label>`;
   return `<label class="f">${l}<input name="${k}" type="${b}" ${req?'required':''} value="${esc(v)}"></label>`}).join('')}
 function admItems(t){return t==='events'?rawEvents.slice().sort((a,b)=>a.start<b.start?-1:1):t==='posts'?posts:regular}
-function admLabel(t,x){return t==='events'?`${esc(x.start)} · ${esc(x.title)}`:t==='posts'?esc(x.t):`${cap(DAYS[x.day])} ${esc(x.time)} · ${esc(x.title)}`}
+function admLabel(t,x){return t==='events'?`${esc(x.start)} · ${esc(x.title)}${x.hideHome?' <span class="small">(skjult på Hjem)</span>':''}`:t==='posts'?esc(x.t):`${cap(DAYS[x.day])} ${esc(x.time)} · ${esc(x.title)}`}
 function admin(){
   const t=state.adm.type,items=admItems(t),ed=state.adm.edit?items.find(x=>x.id==state.adm.edit):null;
   const nSel=items.filter(x=>state.sel[x.id]).length;
