@@ -906,9 +906,17 @@ function lpAsk(key){
   const [col,id,dato]=key.split(':');if(col==='fast')return fastAsk(id,dato);
   const x=(col==='posts'?posts:rawEvents).find(a=>String(a.id)===id);if(!x||!FB)return;
   const tittel=col==='posts'?x.t:x.title,dlg=document.createElement('dialog');dlg.className='lp';
-  dlg.innerHTML='<form class="form" method="dialog"><h3 style="margin:0">Slette «'+esc(tittel)+'»?</h3><p class="small" style="margin:0">'+(col==='posts'?'Nyheten':'Arrangementet')+' fjernes for alle. Du kan rulle tilbake under Meg → Sikkerhetskopi og tilbakerulling.</p><div class="btns"><button class="btn danger" value="slett">Slett</button><button class="btn" value="avbryt">Avbryt</button></div></form>';
+  const mal=col==='posts'?((x.groups||[]).length?{type:'grupper',groups:x.groups}:x.m?{type:'medlem'}:{type:'alle'}):null;
+  const pv=col==='posts'&&PUSH_URL?'<div style="display:grid;gap:8px"><b>Send påminnelse</b><span class="small">Nytt varsel til samme målgruppe som nyheten ('+esc(malTekst(mal))+'). Du kan endre teksten.</span><label class="f">Varseltittel<input id="lpPT" maxlength="60" value="'+esc(('Påminnelse: '+x.t).slice(0,60))+'"></label><label class="f">Varseltekst<textarea id="lpPB" rows="3" maxlength="140">'+esc(String(x.b||'').slice(0,140))+'</textarea></label><button class="btn primary" value="varsel" style="width:auto">Send påminnelse</button></div><hr style="border:0;border-top:1px solid var(--line);width:100%">':'';
+  dlg.innerHTML='<form class="form" method="dialog" onkeydown="if(event.key===\'Enter\'&&event.target.tagName===\'INPUT\')event.preventDefault()"><h3 style="margin:0">'+(col==='posts'?'«'+esc(tittel)+'»':'Slette «'+esc(tittel)+'»?')+'</h3>'+pv+'<h3 style="margin:0;font-size:17px">'+(col==='posts'?'Slette nyheten?':'')+'</h3><p class="small" style="margin:0">'+(col==='posts'?'Nyheten':'Arrangementet')+' fjernes for alle. Du kan rulle tilbake under Meg → Sikkerhetskopi og tilbakerulling.</p><div class="btns"><button class="btn danger" value="slett">Slett</button><button class="btn" value="avbryt">Avbryt</button></div></form>';
   document.body.appendChild(dlg);
-  dlg.addEventListener('close',async()=>{const ok=dlg.returnValue==='slett';dlg.remove();if(!ok)return;
+  dlg.addEventListener('close',async()=>{const rv=dlg.returnValue,ok=rv==='slett',pt0=dlg.querySelector('#lpPT'),pb0=dlg.querySelector('#lpPB'),tt=pt0?pt0.value.trim():'',bb=pb0?pb0.value.trim():'';dlg.remove();
+    if(rv==='varsel'){
+      if(!tt){push('Fyll ut','Skriv en tittel på varselet.');return}
+      try{const res=await FB.sendPush(PUSH_URL,tt,bb,'news',mal);push(res.ok?'Påminnelse sendt':'Ikke sendt',res.ok?'Til '+res.sendt+' av '+res.enheter+' enheter ('+malTekst(mal)+').':res.feil)}
+      catch(er){push('Kunne ikke sende','Ingen kontakt med varseltjenesten.')}
+      return}
+    if(!ok)return;
     try{try{await FB.ensureSnapshot('Før sletting',5*60e3)}catch(er){if(!confirm('Kunne ikke lage et sikkerhetspunkt før sletting ('+((er&&er.code)||'feil')+'). Slette likevel?'))return}
       await FB.del(col,id);if(col==='events')await FB.del('rsvpCounts',id).catch(()=>{});await refresh();push('Slettet','«'+tittel+'» er fjernet.')}
     catch(er){push('Kunne ikke slette',saveMsg(er&&er.code))}});
