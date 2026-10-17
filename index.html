@@ -45,6 +45,8 @@ details.acc[open]>summary{margin-bottom:10px}
 .pw input{padding-right:46px}
 .eye{position:absolute;right:2px;top:50%;transform:translateY(-50%);width:42px;height:42px;border:0;background:none;color:var(--muted);display:grid;place-items:center;border-radius:10px}
 .reg .r .btns{flex:1 1 100%}
+.bell[hidden]{display:none}
+#viewBtn{background:var(--lamp);color:#fff;border-color:var(--lamp)}
 .hr{display:flex;gap:8px;align-items:center;flex:none}
 .bell{position:relative;border:1px solid var(--line);background:var(--surface);width:42px;height:42px;border-radius:50%;display:grid;place-items:center;flex:none}
 .bell i{position:absolute;top:-2px;right:-2px;background:var(--lamp);color:#fff;font-style:normal;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;display:grid;place-items:center;padding:0 4px}
@@ -120,7 +122,7 @@ nav.tabs svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1
 <div class="app">
   <header class="top">
     <div class="logo"><div class="logo-mark"><img src="logo-512.png" alt="Sion Molde"></div><div><b>Sion Molde</b><span id="today"></span></div></div>
-    <div class="hr"><button class="bell" id="themeBtn" type="button"></button><button class="bell" id="bellBtn" aria-label="Varsler"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg><i id="badge">0</i></button></div>
+    <div class="hr"><button class="bell" id="viewBtn" type="button" hidden aria-label="Du ser appen som en annen. Trykk for mer."></button><button class="bell" id="themeBtn" type="button"></button><button class="bell" id="bellBtn" aria-label="Varsler"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10 21a2 2 0 0 0 4 0"/></svg><i id="badge">0</i></button></div>
   </header>
   <main id="view"></main>
   <nav class="tabs" id="tabs"></nav>
@@ -130,6 +132,8 @@ nav.tabs svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1
   <label class="f">Navn<input id="rsN" name="name" type="text" autocomplete="name" required></label>
   <label class="f">E-post eller mobil (valgfritt)<input id="rsK" name="contact" type="text" autocomplete="email"></label>
   <div class="btns"><button class="btn primary" type="submit" style="width:auto">Send</button><button class="btn" type="button" data-rscancel>Avbryt</button></div></form></dialog>
+<dialog id="viewDlg" aria-labelledby="viewT"><div class="form"><h2 id="viewT"></h2><p class="small" id="viewTxt" style="margin:0"></p>
+  <div class="btns"><button class="btn primary" type="button" data-viewback style="width:auto">Tilbake til meg selv</button><button class="btn" type="button" data-viewclose>Lukk</button></div></div></dialog>
 <div id="push" role="status" aria-live="polite"><div class="logo-mark"><img src="logo-512.png" alt=""></div><div><b id="pushT"></b><span id="pushB"></span></div></div>
 
 <script>
@@ -415,8 +419,11 @@ const MOON='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="
 const isDark=()=>{const t=document.documentElement.dataset.theme;return t?t==='dark':matchMedia('(prefers-color-scheme:dark)').matches};
 function themeIcon(){const d=isDark(),b=$('#themeBtn');b.innerHTML=d?SUN:MOON;b.setAttribute('aria-label',d?'Bytt til lys visning':'Bytt til mørk visning');document.querySelector('meta[name=theme-color]').content=d?'#0b2540':'#c9e1fb'}
 themeIcon();matchMedia('(prefers-color-scheme:dark)').addEventListener('change',themeIcon);
-function badge(){$('#badge').textContent=state.unread;$('#badge').hidden=!state.unread}
-const viewBanner=()=>state.view!=='meg'&&state.tab!=='me'?`<div class="alert"><b>Du ser appen som ${state.view==='medlem'?'vanlig innlogget medlem':'besøkende'}.</b><span class="small">Endre under Meg → Vis appen som.</span></div>`:'';
+function badge(){
+  $('#badge').textContent=state.unread;$('#badge').hidden=!state.unread;
+  const vb=$('#viewBtn');if(vb){if(!vb.innerHTML)vb.innerHTML=EYE;vb.hidden=state.view==='meg'}
+}
+const viewBanner=()=>'';
 function render(){drawTabs();$('#view').innerHTML=viewBanner()+VIEWS[state.tab]();badge();window.scrollTo(0,0)}
 let pt;
 function push(t,b){$('#pushT').textContent=t;$('#pushB').textContent=b;$('#push').classList.add('show');clearTimeout(pt);pt=setTimeout(()=>$('#push').classList.remove('show'),4500)}
@@ -502,6 +509,12 @@ document.addEventListener('click',async e=>{
       state.msg='Innholdet er flyttet til databasen.'
     }catch(er){state.msg=saveMsg(er.code)}
     await refresh()}
+  else if(c.id==='viewBtn'||c.closest&&c.closest('#viewBtn')){
+    $('#viewT').textContent='Du ser appen som '+(state.view==='medlem'?'vanlig innlogget medlem':'besøkende');
+    $('#viewTxt').textContent=(state.view==='medlem'?'Du ser bare det som er for innloggede medlemmer, ikke ledersamlinger eller innhold for bestemte grupper.':'Du ser bare det som er åpent for alle, som en som ikke er innlogget.')+' Dette er en forhåndsvisning. Verktøyene dine under Meg virker som vanlig.';
+    $('#viewDlg').showModal()}
+  else if('viewclose' in c.dataset){$('#viewDlg').close()}
+  else if('viewback' in c.dataset){$('#viewDlg').close();state.view='meg';await refresh()}
   else if(c.id==='themeBtn'){const r=document.documentElement;r.dataset.theme=isDark()?'light':'dark';try{localStorage.setItem('sm-theme',r.dataset.theme)}catch(e){}themeIcon()}
 });
 document.addEventListener('submit',async e=>{
