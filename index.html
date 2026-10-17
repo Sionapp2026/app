@@ -170,7 +170,7 @@ async function load(){
   events=e.filter(x=>canSee(x)&&canSeeCat(x.cat)).map(x=>({...x,t:esc(x.title),d:esc(x.text),w:new Date(x.start+'T'+(x.time||'00:00')),e:x.end?new Date(x.end+'T23:59'):null}))
     .filter(x=>(x.e||x.w)>=todayStart).sort((a,b)=>a.w-b.w);
   posts=p.filter(canSee).sort((a,b)=>(b.ms||0)-(a.ms||0));
-  regular=g.filter(r=>canSeeCat(r.cat)).sort((a,b)=>((a.day+6)%7-(b.day+6)%7)||String(a.time).localeCompare(String(b.time)));
+  regular=g.filter(r=>canSeeCat(r.cat)&&visOK(r)).sort((a,b)=>((a.day+6)%7-(b.day+6)%7)||String(a.time).localeCompare(String(b.time)));
   counts=usingFb&&FB?await FB.counts().catch(()=>({})):{};
   members=state.admin&&FB?await FB.listUsers().catch(()=>[]):[];
   state.unread=posts.filter(isNew).length;
@@ -183,7 +183,7 @@ function ago(p){
 const cnt=id=>counts[id]>0?`<div class="small">${counts[id]} kommer</div>`:'';
 const tm=e=>e.time?' kl. '+e.time:'';
 const state={tab:'home',filter:'Alle',member:false,admin:false,user:null,rsvp:{},rem:{},open:{},
-  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',acc:{},sel:{},groups:[],leads:[],ulOpen:'',psMal:'alle',psGr:[],ugOpen:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
+  prefs:{Møter:true,Happeninger:true,Ungdom:false,Viktig:true},unread:0,sv:'',svE:'',pwMsg:'',view:'meg',acc:{},sel:{},groups:[],leads:[],ulOpen:'',psMal:'alle',psGr:[],ugOpen:'',backupMsg:'',pushMsg:'',pushSendMsg:'',psT:'',psB:'',psTab:'news',psNews:true,psHide:false,pushOk:false,memMsg:'',memE:'',memR:'member',adm:{type:'events',edit:null},msg:'',err:''};
 try{Object.assign(state,JSON.parse(localStorage.getItem('sm-proto')||'{}'))}catch(e){}
 state.member=false;state.admin=false;state.user=null;
 {const dt=new URLSearchParams(location.search).get('tab');if(['home','prog','news','me'].includes(dt)){state.tab=dt;try{history.replaceState(null,'',location.pathname)}catch(e){}}}
@@ -278,14 +278,19 @@ function news(){
 const CATS=['Møte','Samling','Ledersamling','Menighetsmøte','Happeninger','Ungdom'];
 const normCat=c=>c==='Møter'?'Møte':c;
 /* «Ledersamling» er bare for ledere: administratorer, gruppeledere og medlemmer i gruppen Lederrådet. Andre ser verken kategorien eller arrangementene. */
-const canSeeCat=c=>normCat(c)!=='Ledersamling'||state.admin||(state.leads||[]).length>0||(state.groups||[]).includes('lederradet');   // eldre arrangementer og faste samlinger bruker «Møter»
+/* Visning: «meg» (mine egne rettigheter), «medlem» (vanlig innlogget medlem uten grupper) eller «besok» (ikke innlogget). Påvirker bare hva som vises som innhold. */
+const effAdmin=()=>state.admin&&state.view==='meg';
+const effLeads=()=>state.view==='meg'?(state.leads||[]):[];
+const effGroups=()=>state.view==='meg'?(state.groups||[]):[];
+const visOK=x=>state.view!=='besok'||!x.m;
+const canSeeCat=c=>normCat(c)!=='Ledersamling'||effAdmin()||effLeads().length>0||effGroups().includes('lederradet');   // eldre arrangementer og faste samlinger bruker «Møter»
 /* Grupper i menigheten: [id, navn, forklaring]. Samme id-er står i varsel-script.gs. Brukere plasseres i grupper under Brukere. */
 const GROUPS=[['sondagsskole','Søndagsskole','barnearbeid'],['activ8','Activ8','ungdom'],['hangout','Hangout','unge voksne'],['debora','Debora','kvinnearbeid'],['cdur','Sion C-dur','mannsfellesskap'],['kjokken','Kjøkken',''],['torsdagsgruppa','Torsdagsgruppa',''],['vertskap','Vertskap',''],['lederradet','Lederrådet',''],['ungdomsledere','Ungdomsledere',''],['sommerstevne','Sommerstevne','']];
 const GR_IDS=GROUPS.map(g=>g[0]);
 const gName=id=>{const g=GROUPS.find(x=>x[0]===id);return g?g[1]:id};
 const gLabel=id=>{const g=GROUPS.find(x=>x[0]===id);return g?g[1]+(g[2]?' ('+g[2]+')':''):id};
 /* Innhold med grupper vises bare for administratorer og medlemmer i minst én av gruppene. Dette er en visning i appen; sikkerheten for «bare medlemmer» ligger i databasen. */
-const canSee=x=>!(x.groups&&x.groups.length)||state.admin||(state.groups||[]).concat(state.leads||[]).some(g=>x.groups.includes(g));
+const canSee=x=>visOK(x)&&(!(x.groups&&x.groups.length)||effAdmin()||effGroups().concat(effLeads()).some(g=>x.groups.includes(g)));
 /* Gruppeledere (leads på oppføringen i members) kan bare publisere til gruppene de leder. Det håndheves i databasen (firestore.rules) og i varselscriptet. */
 const isLeader=()=>!state.admin&&(state.leads||[]).length>0;
 const myGroupOptions=()=>state.admin?GR_IDS:(state.leads||[]);
@@ -376,6 +381,10 @@ function backupCard(){
   <button class="btn" data-backup>Last ned sikkerhetskopi</button>
   <p class="small" role="status" style="margin:8px 0 0">${esc(state.backupMsg)}</p></details>`}
 
+function viewCard(){
+  const meg=state.admin?'Meg selv (administrator)':'Meg selv (gruppeleder)';
+  return `<div class="card"><label class="f">Vis appen som<select id="viewSel">${[['meg',meg],['medlem','Vanlig innlogget medlem'],['besok','Besøkende (ikke innlogget)']].map(([v,l])=>`<option value="${v}" ${state.view===v?'selected':''}>${l}</option>`).join('')}</select></label><p class="small" style="margin:6px 0 0">Gjelder hva du ser under Hjem, Program og Nyheter, slik at du kan sjekke hva andre ser. Verktøyene dine under Meg påvirkes ikke.</p></div>`}
+
 function loginCard(){
   if(state.user)return `<div class="card"><div class="row"><div class="grow"><b>${state.admin?'Innlogget som administrator':isLeader()?'Innlogget som gruppeleder':state.member?'Innlogget som medlem':'Innlogget, men ikke på medlemslisten'}</b><div class="small">${esc(state.user.email)}</div></div>
    <button class="btn" data-logout>Logg ut</button></div>
@@ -394,6 +403,7 @@ function loginCard(){
 function me(){
   const sw=(k,l,s)=>`<div class="switch"><div><b>${l}</b><div class="small">${s}</div></div><button class="tg" role="switch" aria-checked="${state.prefs[k]}" aria-label="${l}" data-pref="${k}"></button></div>`;
   return `<h1>Meg</h1>${loginCard()}
+  ${state.admin||isLeader()?viewCard():''}
   ${pushCard()}
   ${state.user?`<details class="card acc" data-acc="flere" ${state.acc.flere?'open':''}><summary><h2>Medlem i flere menigheter?</h2></summary><p class="small" style="margin:0">Mange medlemmer står registrert i andre menigheter enn Sion, og da mister vi statsstøtten for dem. <a href="https://person.brreg.no/nb/minside/tros-og-livssyn" target="_blank" rel="noopener">Sjekk her om du er medlem andre steder</a>. Takk for hjelpen!</p></details>`:''}
 
@@ -406,10 +416,11 @@ const isDark=()=>{const t=document.documentElement.dataset.theme;return t?t==='d
 function themeIcon(){const d=isDark(),b=$('#themeBtn');b.innerHTML=d?SUN:MOON;b.setAttribute('aria-label',d?'Bytt til lys visning':'Bytt til mørk visning');document.querySelector('meta[name=theme-color]').content=d?'#0b2540':'#c9e1fb'}
 themeIcon();matchMedia('(prefers-color-scheme:dark)').addEventListener('change',themeIcon);
 function badge(){$('#badge').textContent=state.unread;$('#badge').hidden=!state.unread}
-function render(){drawTabs();$('#view').innerHTML=VIEWS[state.tab]();badge();window.scrollTo(0,0)}
+const viewBanner=()=>state.view!=='meg'&&state.tab!=='me'?`<div class="alert"><b>Du ser appen som ${state.view==='medlem'?'vanlig innlogget medlem':'besøkende'}.</b><span class="small">Endre under Meg → Vis appen som.</span></div>`:'';
+function render(){drawTabs();$('#view').innerHTML=viewBanner()+VIEWS[state.tab]();badge();window.scrollTo(0,0)}
 let pt;
 function push(t,b){$('#pushT').textContent=t;$('#pushB').textContent=b;$('#push').classList.add('show');clearTimeout(pt);pt=setTimeout(()=>$('#push').classList.remove('show'),4500)}
-function keep(fn){const y=scrollY;fn();$('#view').innerHTML=VIEWS[state.tab]();drawTabs();badge();window.scrollTo(0,y)}
+function keep(fn){const y=scrollY;fn();$('#view').innerHTML=viewBanner()+VIEWS[state.tab]();drawTabs();badge();window.scrollTo(0,y)}
 async function refresh(){await load();keep(()=>{})}
 const authMsg=c=>({'auth/invalid-credential':'Feil e-post eller passord.','auth/invalid-email':'Ugyldig e-postadresse.','auth/user-disabled':'Brukeren er sperret.','auth/too-many-requests':'For mange forsøk. Vent litt og prøv igjen.','auth/network-request-failed':'Ingen nettforbindelse.','auth/weak-password':'Passordet er for svakt. Bruk minst 8 tegn.','auth/requires-recent-login':'Logg ut og inn igjen, og prøv på nytt.'}[c]||'Noe gikk galt. Prøv igjen.');
 const saveMsg=c=>c==='permission-denied'?'Du har ikke tilgang til å lagre.':'Kunne ikke lagre ('+(c||'ukjent feil')+').';
@@ -573,6 +584,7 @@ document.addEventListener('submit',async e=>{
 document.addEventListener('toggle',e=>{const k=e.target&&e.target.dataset&&e.target.dataset.acc;if(k)state.acc[k]=e.target.open},true);
 document.addEventListener('change',async e=>{
   const d=e.target.dataset||{};
+  if(e.target.id==='viewSel'){state.view=e.target.value;await refresh();return}
   if(e.target.id==='psMal'){state.psMal=e.target.value;const bx=$('#psGrBox');if(bx)bx.hidden=state.psMal!=='grupper';return}
   if('psgr' in d){const s=new Set(state.psGr);e.target.checked?s.add(d.psgr):s.delete(d.psgr);state.psGr=[...s];return}
   if('ul' in d){
@@ -599,6 +611,7 @@ async function start(){
     state.admin=u?await FB.isAdmin(u.email):false;
     state.member=!!u&&(state.admin||await FB.isMember(u.email));
     FB.full=state.member;
+    state.view='meg';
     state.groups=u&&state.member?await FB.myGroups(u.email):[];
     state.leads=u&&state.member&&!state.admin?await FB.myLeads(u.email):[];
     if(u&&lsGet('sm-push'))FB.linkPush(lsGet('sm-push')).catch(()=>{});
