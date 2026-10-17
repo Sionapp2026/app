@@ -771,11 +771,14 @@ function fastAsk(id,dato){
   const ex=(r.ex||{})[dato]||null,d=new Date(dato+'T'+r.time),dn=cap(DAYS[d.getDay()])+' '+d.getDate()+'. '+MON[d.getMonth()],dlg=document.createElement('dialog');dlg.className='lp';
   const stat=ex?(ex.k==='avlyst'?'Avlyst denne gangen.':ex.k==='endret'?'Endret denne gangen'+(ex.time?': kl. '+ex.time:'')+(ex.note?' · '+ex.note:'')+'.':''):'';
   dlg.innerHTML='<form class="form" method="dialog" onkeydown="if(event.key===\'Enter\'&&event.target.tagName===\'INPUT\')event.preventDefault()"><h3 style="margin:0">'+esc(r.title)+'</h3><p class="small" style="margin:0">'+esc(dn)+' kl. '+esc(r.time)+(stat?'<br><b>'+esc(stat)+'</b>':'')+'</p>'
-   +(PUSH_URL?'<label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="lpPush" style="width:22px;height:22px;flex:none">Send varsel til alle (gjelder avlys og endre)</label>':'')
+   +(PUSH_URL?'<label style="display:flex;gap:8px;align-items:center;font-weight:600"><input type="checkbox" id="lpPush" style="width:22px;height:22px;flex:none">Send varsel til alle (gjelder avlys og endre)</label><div id="lpMsg" style="display:none;gap:8px"><label class="f">Varseltittel<input id="lpPT" maxlength="60"></label><label class="f">Varseltekst<textarea id="lpPB" rows="3" maxlength="140"></textarea></label><span class="small">Standardteksten settes inn automatisk. Skriv over den hvis du vil si noe annet.</span></div>':'')
    +'<div class="btns col">'+(ex&&ex.k!=='fjernet'?'<button class="btn" value="angre">Angre ('+(ex.k==='avlyst'?'avlysning':'endring')+')</button>':'')+(ex&&ex.k==='avlyst'?'':'<button class="btn" value="avlys">Merk denne gangen som avlyst</button>')+'<button class="btn" value="fjern">Fjern bare denne gangen</button></div>'
    +'<details><summary style="cursor:pointer;font-weight:600">Endre denne gangen</summary><div style="display:grid;gap:8px;margin-top:8px"><label class="f">Nytt klokkeslett<input id="lpTime" type="time"></label><label class="f">Ny merknad<input id="lpNote" type="text" maxlength="100"></label><button class="btn" value="endre">Lagre endringen</button></div></details>'
    +'<div class="btns col"><button class="btn" value="rediger">Endre hele den faste samlingen</button><button class="btn danger" value="slettalle">Slett hele den faste samlingen</button><button class="btn" value="avbryt">Avbryt</button></div></form>';
   document.body.appendChild(dlg);
+  const defs=(rv,tid,nt)=>rv==='endre'?['Endret: '+r.title,dn+(TIDOK(tid)?', nå kl. '+tid:'')+(nt?'. '+nt:'')]:['Avlyst: '+r.title,dn+' kl. '+r.time+' er avlyst.'];
+  const pt=dlg.querySelector('#lpPT'),pb=dlg.querySelector('#lpPB'),pc=dlg.querySelector('#lpPush');let dirty=false;
+  if(pc){const d0=defs('avlys');pt.value=d0[0];pb.value=d0[1];pc.addEventListener('change',()=>{dlg.querySelector('#lpMsg').style.display=pc.checked?'grid':'none'});[pt,pb].forEach(i=>i.addEventListener('input',()=>{dirty=true}))}
   dlg.addEventListener('close',async()=>{
     const rv=dlg.returnValue,send=!!(dlg.querySelector('#lpPush')&&dlg.querySelector('#lpPush').checked),time=dlg.querySelector('#lpTime').value.trim(),note=dlg.querySelector('#lpNote').value.trim();dlg.remove();
     try{
@@ -793,7 +796,7 @@ function fastAsk(id,dato){
       await FB.setFastEx(id,nx);
       let tillegg='';
       if(send&&PUSH_URL&&(rv==='avlys'||rv==='endre')){
-        const tittel=(rv==='avlys'?'Avlyst: ':'Endret: ')+r.title,body=rv==='avlys'?dn+' kl. '+r.time+' er avlyst.':dn+(TIDOK(time)?', nå kl. '+time:'')+(note?'. '+note:'');
+        const df=defs(rv,time,note),tittel=dirty&&pt.value.trim()?pt.value.trim():df[0],body=dirty&&pb.value.trim()?pb.value.trim():df[1];
         try{const res=await FB.sendPush(PUSH_URL,tittel,body,'prog',{type:'alle'});tillegg=res.ok?' Varsel sendt til '+res.sendt+' enheter.':' Varsel ikke sendt: '+res.feil}catch(x){tillegg=' Varsel kunne ikke sendes.'}}
       await refresh();
       push(rv==='avlys'?'Merket som avlyst':rv==='fjern'?'Fjernet denne gangen':rv==='endre'?'Endret':'Angret',(dn+'.')+tillegg)
