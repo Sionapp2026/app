@@ -260,7 +260,7 @@ function svCard(){
 function home(){
   const vis=events.filter(e=>(!e.m||state.member)&&!e.hideHome), n=vis[0];
   const fast=nextFast();
-  const wk=[...vis.slice(1,4).map(e=>({ev:e,w:e.w})),...fast.map(f=>({fast:f.fast,w:f.w}))].sort((a,b)=>a.w-b.w).slice(0,6);
+  const wk=[...vis.slice(0,4).map(e=>({ev:e,w:e.w})),...fast.map(f=>({fast:f.fast,w:f.w}))].sort((a,b)=>a.w-b.w).slice(0,6);
   const post=posts.filter(p=>(!p.m||state.member)&&!p.hideHome)[0];
   return `<div><h1>Velkommen</h1><span class="script">dette skjer i Sion Molde</span></div>
   ${n?`<div class="card next"><div class="eyebrow">Neste samling</div><h2>${n.t}</h2>
