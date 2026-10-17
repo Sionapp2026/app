@@ -265,7 +265,7 @@ function regList(){
 function news(){
   const l=posts.map(p=>{
    if(p.m&&!state.member)return `<div class="card locked"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><div><b style="color:var(--ink)">${esc(p.t)}</b><div class="small">Logg inn som medlem for å lese.</div></div></div>`;
-   return `<div class="card post"><div class="head">${isNew(p)?'<span class="dot" title="Ulest"></span>':''}<span class="tag ${p.m?'m':''}">${esc(p.tag)}</span><span class="small">${esc(ago(p))}</span></div><h3>${esc(p.t)}</h3><div class="small" style="color:var(--ink)">${esc(p.b)}</div></div>`}).join('');
+   return `<div class="card post"><div class="head">${isNew(p)?'<span class="dot" title="Ulest"></span>':''}${(p.audience&&p.audience.length?p.audience:[p.tag]).map(a=>`<span class="tag ${a==='Medlem'?'m':''}">${esc(a)}</span>`).join(' ')}<span class="small">${esc(ago(p))}</span></div><h3>${esc(p.t)}</h3><div class="small" style="color:var(--ink)">${esc(p.b)}</div></div>`}).join('');
   return `<h1>Nyheter</h1><div class="list">${l||'<p class="small">Ingen nyheter ennå.</p>'}</div>`}
 
 /* ---------- Innlogging og administrasjon ---------- */
@@ -274,7 +274,7 @@ const PLACES=['Kometvegen 7','Åndalsnes','Eidsvåg','Eide','Tingvoll'],TIMES=['
 /* [felt, etikett, type, valg, type på feltet for «Annet»]. Stjerne etter typen betyr obligatorisk. */
 const FIELDS={
  events:[['title','Tittel','text*'],['start','Startdato','date*'],['end','Sluttdato (bare for flere dager)','date'],['time','Klokkeslett','combo',TIMES,'time'],['place','Sted','combo',PLACES,'text'],['who','Taler eller hvem','text'],['text','Beskrivelse','area'],['cat','Kategori','sel',CATS],['m','Bare for medlemmer','chk'],['hideHome','Ikke vis på Hjem (vises fortsatt i Program)','chk']],
- posts:[['t','Tittel','text*'],['b','Melding','area*'],['tag','Målgruppe','sel',['Alle','Medlem','Ungdom']],['hideHome','Ikke vis på Hjem (vises fortsatt i Nyheter)','chk'],['push','Send også som varsel til telefonene','chk']],
+ posts:[['t','Tittel','text*'],['b','Melding','area*'],['audience','Målgruppe','multi',['Alle','Medlem','Ungdom']],['hideHome','Ikke vis på Hjem (vises fortsatt i Nyheter)','chk'],['push','Send også som varsel til telefonene','chk']],
  regular:[['title','Tittel','text*'],['day','Ukedag','sel',[1,2,3,4,5,6,0]],['time','Klokkeslett','combo*',TIMES,'time'],['note','Merknad','text'],['cat','Kategori','sel',CATS]]};
 const COL={events:'events',posts:'posts',regular:'regular'};
 const TYPES=[['events','Arrangement'],['posts','Nyhet'],['regular','Fast samling']];
@@ -282,12 +282,16 @@ function fields(t,ed){return FIELDS[t].filter(f=>f[0]!=='push'||(PUSH_URL&&!ed))
   const req=ty.endsWith('*'),b=ty.replace('*',''),v=ed?ed[k]:undefined;
   if(b==='combo'){const known=!v||o.includes(v),cur=!ed?o[0]:!v?(req?o[0]:''):known?v:'__annet';
     return `<label class="f">${l}<select name="${k}Sel">${o.map(x=>`<option value="${x}" ${cur===x?'selected':''}>${x}</option>`).join('')}${req?'':`<option value="" ${cur===''?'selected':''}>Ikke oppgitt</option>`}<option value="__annet" ${cur==='__annet'?'selected':''}>Annet</option></select><input name="${k}" type="${it}" value="${known?'':esc(v)}" ${known?'hidden':''}></label>`}
+  if(b==='multi'){
+    const cur=ed?(ed.audience&&ed.audience.length?ed.audience:[ed.tag||'Alle']):['Alle'];
+    const navn={Alle:'Alle (åpen for alle)',Medlem:'Bare medlemmer (innloggede)',Ungdom:'Ungdom (merkelapp)'};
+    return `<fieldset class="f" style="border:0;padding:0;margin:0"><legend style="font-weight:600;font-size:14px;margin-bottom:4px">${l}</legend>${o.map(x=>`<label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="checkbox" name="${k}" value="${x}" style="width:22px;height:22px;flex:none" ${cur.includes(x)?'checked':''}>${navn[x]||x}</label>`).join('')}<span class="small">Velger du ingenting, blir nyheten åpen for alle. «Bare medlemmer» skjuler den for besøkende som ikke er innlogget. «Ungdom» er foreløpig bare en merkelapp, ikke en begrensning.</span></fieldset>`}
   if(b==='area')return `<label class="f">${l}<textarea name="${k}" rows="3" ${req?'required':''}>${esc(v)}</textarea></label>`;
   if(b==='sel')return `<label class="f">${l}<select name="${k}">${o.map(x=>`<option value="${x}" ${String(v==null?o[0]:v)===String(x)?'selected':''}>${k==='day'?cap(DAYS[x]):x}</option>`).join('')}</select></label>`;
   if(b==='chk')return `<label class="f" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="${k}" style="width:auto" ${v?'checked':''}>${l}</label>`;
   return `<label class="f">${l}<input name="${k}" type="${b}" ${req?'required':''} value="${esc(v)}"></label>`}).join('')}
 function admItems(t){return t==='events'?rawEvents.slice().sort((a,b)=>a.start<b.start?-1:1):t==='posts'?posts:regular}
-function admLabel(t,x){return t==='events'?`${esc(x.start)} · ${esc(x.title)}${x.hideHome?' <span class="small">(skjult på Hjem)</span>':''}`:t==='posts'?esc(x.t)+(x.hideHome?' <span class="small">(skjult på Hjem)</span>':''):`${cap(DAYS[x.day])} ${esc(x.time)} · ${esc(x.title)}`}
+function admLabel(t,x){return t==='events'?`${esc(x.start)} · ${esc(x.title)}${x.hideHome?' <span class="small">(skjult på Hjem)</span>':''}`:t==='posts'?esc(x.t)+(x.tag&&x.tag!=='Alle'?' <span class="small">('+esc(x.tag)+')</span>':'')+(x.hideHome?' <span class="small">(skjult på Hjem)</span>':''):`${cap(DAYS[x.day])} ${esc(x.time)} · ${esc(x.title)}`}
 function admin(){
   const t=state.adm.type,items=admItems(t),ed=state.adm.edit?items.find(x=>x.id==state.adm.edit):null;
   const nSel=items.filter(x=>state.sel[x.id]).length;
@@ -473,7 +477,7 @@ document.addEventListener('submit',async e=>{
     state.psT=t;state.psB=b;state.psTab=tab;state.psNews=asNews;state.psHide=hide;keep(()=>state.pushSendMsg='Sender ...');
     // Nyheten legges ut først, så varselet aldri peker til noe som ikke finnes.
     if(asNews){
-      try{await FB.add('posts',{t,b,tag:'Alle',m:false,hideHome:hide});usingFb=true}
+      try{await FB.add('posts',{t,b,tag:'Alle',audience:['Alle'],m:false,hideHome:hide});usingFb=true}
       catch(er){keep(()=>state.pushSendMsg='Kunne ikke legge ut nyheten ('+((er&&er.code)||'feil')+'). Varselet er ikke sendt.');return}
     }
     const kort=b.length>140?b.slice(0,137)+'…':b;
@@ -507,9 +511,9 @@ document.addEventListener('submit',async e=>{
     catch(er){keep(()=>{state.sv='Kunne ikke melde på. Sjekk nettforbindelsen og prøv igjen.';state.svE=m})}}
   else if(f.id==='adm'){e.preventDefault();
     const t=f.dataset.type,fd=new FormData(f),d={};
-    FIELDS[t].forEach(([k,,ty])=>{const b=ty.replace('*','');d[k]=b==='combo'?(fd.get(k+'Sel')==='__annet'?String(fd.get(k)||'').trim():fd.get(k+'Sel')):b==='chk'?fd.has(k):k==='day'?+fd.get(k):String(fd.get(k)||'').trim()});
+    FIELDS[t].forEach(([k,,ty])=>{const b=ty.replace('*','');d[k]=b==='multi'?fd.getAll(k):b==='combo'?(fd.get(k+'Sel')==='__annet'?String(fd.get(k)||'').trim():fd.get(k+'Sel')):b==='chk'?fd.has(k):k==='day'?+fd.get(k):String(fd.get(k)||'').trim()});
     const wantPush=t==='posts'&&!!d.push;if(t==='posts')delete d.push;
-    if(t==='posts')d.m=d.tag==='Medlem';
+    if(t==='posts'){let a=d.audience||[];if(a.includes('Alle')||!a.length)a=['Alle'];d.audience=a;d.tag=a.join(' · ');d.m=a.includes('Medlem')}
     if(t==='regular'){d.m=false;if(!d.time){keep(()=>state.msg='Velg eller skriv inn klokkeslett.');return}}
     if(t==='events')d.m=!!d.m;
     const isEdit=!!state.adm.edit;
